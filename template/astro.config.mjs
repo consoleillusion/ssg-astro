@@ -200,6 +200,50 @@ const userCssReload = {
 };
 
 /**
+ * Advertise UTF-8 on HTML responses. Bare Markdown/MDX pages render without a
+ * <meta charset> (there is no default layout), and without a charset the
+ * browser guesses one — which garbles multibyte characters (curly quotes,
+ * arrows, dashes). Layout pages already carry <meta charset="UTF-8">; this
+ * makes the response header agree, and covers the bare pages too.
+ *
+ * @type {import('vite').Plugin}
+ */
+const utf8Html = {
+	name: 'ssg-utf8-html',
+	configureServer(server) {
+		server.middlewares.use((req, res, next) => {
+			const writeHead = res.writeHead.bind(res);
+			const withCharset = (...args) => {
+				// Vite may pass content-type explicitly to writeHead, which
+				// takes precedence over res.setHeader — rewrite it in place.
+				for (let i = 1; i < args.length; i++) {
+					const headers = args[i];
+					if (!headers || typeof headers !== 'object' || Array.isArray(headers)) {
+						continue;
+					}
+					const key = Object.keys(headers).find((name) => name.toLowerCase() === 'content-type');
+					const ct = key ? String(headers[key]).toLowerCase() : '';
+					if (ct.startsWith('text/html') && !ct.includes('charset')) {
+						args[i] = { ...headers, [key ?? 'content-type']: 'text/html; charset=utf-8' };
+					}
+				}
+				// Fallback for an implicit writeHead (res.end() with no headers).
+				const contentType = res.getHeader('content-type');
+				const value = Array.isArray(contentType) ? contentType.join('; ') : contentType;
+				const lower = typeof value === 'string' ? value.toLowerCase() : '';
+				if (lower.startsWith('text/html') && !lower.includes('charset')) {
+					res.setHeader('content-type', 'text/html; charset=utf-8');
+				}
+				return writeHead(...args);
+			};
+			// Connect's types for res are loose; writeHead is intact at runtime.
+			/** @type {any} */ (res).writeHead = withCharset;
+			next();
+		});
+	},
+};
+
+/**
  * Rewrite lowercase URLs to the case-preserving route Astro generates.
  * This keeps links extensionless and lowercase while matching files such as
  * README.md, About.astro, or docs/Getting-Started.md.
@@ -258,6 +302,6 @@ const lowercaseRoutes = {
 export default defineConfig({
 	integrations: [missingPage, themeStyles, userStyles, mdx(), svelte()],
 	vite: {
-		plugins: [lowercaseRoutes, userCssReload],
+		plugins: [utf8Html, lowercaseRoutes, userCssReload],
 	},
 });
