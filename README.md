@@ -135,7 +135,7 @@ nix run github:consoleillusion/ssg-astro#serve -- --menu
 
 ## Editing pages
 
-Pass `--edit` to `serve`:
+Already serving a folder of notes, docs, or a small site and notice a typo? With `--edit` you don't need to hunt down the right file on disk — the page itself is the editor. Run the server with the flag and every page backed by an `.md`, `.mdx`, or `.html` file becomes editable in the browser; pressing Save writes your change straight back to the source file, and the dev server reloads to show it rendered.
 
 ```bash
 # Node CLI
@@ -145,17 +145,30 @@ npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --edit
 nix run github:consoleillusion/ssg-astro#serve -- --edit
 ```
 
-With `--edit`, pages backed by `.md` or `.mdx` files are edited in the browser one block at a time: each blank-line-separated block of the source is shown rendered; clicking a block swaps in an inline Markdown source editor (an auto-growing textarea) with a live preview below it, plus Save and Cancel buttons directly underneath. Save replaces just that block in the file and reloads; Cancel discards the edit. Front matter is preserved.
+This is particularly nice for Markdown. Each page is broken into its natural blocks (paragraphs, lists, code fences, …); hovering a block outlines it, and clicking one swaps it for an inline editor containing the raw Markdown for just that block, with a live preview right below it. Edit like you normally would in any text editor — Markdown syntax is the interface — and hit the Save button below the block (or Cancel to discard). Only that block's text is re-written in the file; the rest of the page is untouched. Front matter (the `---` metadata header) is preserved automatically.
 
-Diagram blocks written as `::: mermaid` containers render as SVG diagrams on every page, both in normal viewing and in the edit preview (mermaid is lazy-loaded only when such a container is present). Writing ` ```mermaid ` as a fenced code block instead shows the diagram source as code.
+```bash
+# e.g. fix this in the browser and save:
+# edit-demo/guide.md
+#
+#   # Getting Started
+#   some text intro      ← click here to edit, save, done
+```
 
-Pages backed by `.html` files instead get a plain contenteditable main-content area with a floating Save button; saving replaces the `<main>` element in place.
+`.mdx` files work the same way, though the edit is plain text: MDX components inside a block are edited as text and re-saved verbatim rather than parsed and re-rendered.
 
-Pages backed by `.html` files instead get a plain contenteditable main-content area with the same Save button; saving replaces the `<main>` element in place.
+Fenced ` ```mermaid ` blocks render as code (like any code fence), while a `::: mermaid` container renders as an actual SVG diagram on the page — also in the edit preview:
 
-Pages without a matching source file are read-only: `.astro` pages (their component syntax cannot be reconstructed from rendered HTML), the built-in default page, and the 404 page. Only the page's main content is editable — surrounding layout, menu, and chrome are hidden or untouched. The dev server reloads the page after a successful save.
+````md
+::: mermaid
+graph TD
+  A-->B
+:::
+````
 
-Because saving rewrites the source file, keep `--edit` for trusted local use; do not expose an editable server to the network with `--host`.
+Pages backed by `.html` files are edited differently: they get a plain contenteditable main-content area with a floating Save button, and saving replaces the `<main>` element in place. Navigation, headers, and any chrome outside `<main>` are left alone.
+
+Some things are deliberately read-only: `.astro` pages (their component syntax can't be reconstructed from rendered HTML), the built-in default page, and the 404 page. And because Save rewrites files in the served directory, keep `--edit` for trusted local use — don't combine it with `--host`.
 
 ## Disabling the default missing page
 
