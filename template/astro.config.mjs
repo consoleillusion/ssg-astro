@@ -308,7 +308,7 @@ if (!status.editable) {
 	}
 	const list = document.createElement('div');
 	list.className = 'ssg-edit-blocks';
-	list.style.cssText = 'max-width:46rem;margin:0 auto;padding:1.5rem 1rem;display:flex;flex-direction:column;gap:0.35rem';
+	list.style.cssText = 'box-sizing:border-box;width:100%;max-width:46rem;margin:0 auto;padding:1.5rem 1rem;display:flex;flex-direction:column;gap:0.35rem';
 	target.append(list);
 
 	const renderBlocks = () => {
@@ -333,8 +333,9 @@ if (!status.editable) {
 		cell.style.display = 'none';
 
 		const editorWrap = document.createElement('div');
-		editorWrap.style.cssText = 'border:2px solid #4f8ef7;border-radius:0.5rem;padding:0.35rem 0.5rem';
+		editorWrap.style.cssText = 'box-sizing:border-box;width:100%;border:2px solid #4f8ef7;border-radius:0.5rem;padding:0.35rem 0.5rem';
 		const root = document.createElement('div');
+		root.style.width = '100%';
 		editorWrap.append(root);
 
 		const controls = document.createElement('div');
