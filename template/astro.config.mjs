@@ -282,6 +282,13 @@ const editButton = (label, background) => {
 	return button;
 };
 
+// The navigation menu is chrome, never editable content.
+const markMenuInert = () => {
+	for (const el of document.querySelectorAll('details.ssg-menu')) {
+		el.contentEditable = 'false';
+	}
+};
+
 const response = await fetch('/astro-ssg-edit/status?path=' + encodeURIComponent(window.location.pathname));
 if (!response.ok) throw new Error('Could not query edit status');
 const status = await response.json();
@@ -289,6 +296,7 @@ if (!status.editable) {
 	// Nothing to edit on this route (astro pages, default page, 404).
 } else if (status.type === '.md' || status.type === '.mdx') {
 	// Live markdown WYSIWYG, one block at a time, via Milkdown Crepe.
+	markMenuInert();
 	const sourceResponse = await fetch('/astro-ssg-edit/source?path=' + encodeURIComponent(window.location.pathname));
 	const source = await sourceResponse.json();
 	if (!source.ok) throw new Error(source.error ?? 'Could not load markdown source');
@@ -379,6 +387,7 @@ if (!status.editable) {
 	renderBlocks();
 } else {
 	// Static HTML: contenteditable main with an explicit Save button.
+	markMenuInert();
 	const target = document.querySelector('main') ?? document.body;
 	target.contentEditable = 'true';
 	target.dataset.ssgEditTarget = 'true';
