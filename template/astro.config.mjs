@@ -66,43 +66,43 @@ const missingPage = {
 	},
 };
 
-const classlessThemes = ['sakura', 'milligram', 'skeleton'];
-const requestedClasslessTheme = (process.env.SSG_CLASSLESS ?? '').trim().toLowerCase();
-const classlessTheme = classlessThemes.includes(requestedClasslessTheme)
-	? requestedClasslessTheme
+const themeNames = ['sakura', 'sakura-dark', 'sakura-dark-solarized', 'sakura-earthly', 'sakura-ink', 'sakura-pink', 'sakura-radical', 'sakura-vader', 'milligram', 'skeleton'];
+const requestedTheme = (process.env.SSG_THEME ?? '').trim().toLowerCase();
+const theme = themeNames.includes(requestedTheme)
+	? requestedTheme
 	: '';
 
 const userCssPath = (process.env.SSG_CSS_PATH ?? '').trim();
 const userCssRoute = '/astro-ssg-user.css';
 
 /**
- * Serve the selected classless stylesheet from node_modules and add it to
+ * Serve the selected theme stylesheet from node_modules and add it to
  * pages that do not already get it from Layout.astro (for example Markdown
  * pages).
  *
  * @type {import('astro').AstroIntegration}
  */
-const classlessStyles = {
-	name: 'ssg-classless-styles',
+const themeStyles = {
+	name: 'ssg-theme-styles',
 	hooks: {
 		'astro:config:setup': ({ injectRoute, injectScript }) => {
-			if (!classlessTheme) {
+			if (!theme) {
 				return;
 			}
 
 			injectRoute({
-				pattern: `/${classlessTheme}.css`,
+				pattern: `/${theme}.css`,
 				entrypoint: './src/theme/css.ts',
 			});
 
 			injectScript(
 				'page',
 				`
-if (!document.querySelector('link[data-ssg-classless]')) {
+if (!document.querySelector('link[data-ssg-theme]')) {
 	const link = document.createElement('link');
 	link.rel = 'stylesheet';
-	link.href = ${JSON.stringify(`/${classlessTheme}.css`)};
-	link.dataset.ssgClassless = ${JSON.stringify(classlessTheme)};
+	link.href = ${JSON.stringify(`/${theme}.css`)};
+	link.dataset.ssgTheme = ${JSON.stringify(theme)};
 	document.head.appendChild(link);
 }
 `
@@ -256,7 +256,7 @@ const lowercaseRoutes = {
 
 // https://astro.build/config
 export default defineConfig({
-	integrations: [missingPage, classlessStyles, userStyles, mdx(), svelte()],
+	integrations: [missingPage, themeStyles, userStyles, mdx(), svelte()],
 	vite: {
 		plugins: [lowercaseRoutes, userCssReload],
 	},
