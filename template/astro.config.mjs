@@ -316,6 +316,18 @@ const editButton = (label, background) => {
 	return button;
 };
 
+// Shared fade/slide transitions so editor open/close and save/cancel don't jump.
+const editTransitions =
+	'@keyframes ssg-edit-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }\n' +
+	'.ssg-edit-wrap { transition: opacity .16s ease, transform .16s ease; animation: ssg-edit-in .18s ease; }\n' +
+	'.ssg-edit-wrap.ssg-edit-leaving { opacity: 0; transform: translateY(-6px); }\n' +
+	'.ssg-edit-block { transition: opacity .16s ease; }\n' +
+	'.ssg-edit-block.ssg-edit-entering { opacity: 0; }\n' +
+	'@media (prefers-reduced-motion: reduce) { .ssg-edit-wrap, .ssg-edit-block { transition: none; animation: none; } }';
+const editStyle = document.createElement('style');
+editStyle.textContent = editTransitions;
+document.head.append(editStyle);
+
 // The navigation menu is chrome, never editable content.
 const markMenuInert = () => {
 	for (const el of document.querySelectorAll('details.ssg-menu')) {
@@ -370,6 +382,7 @@ if (!status.editable) {
 		cell.style.display = 'none';
 
 		const editorWrap = document.createElement('div');
+		editorWrap.className = 'ssg-edit-wrap';
 		editorWrap.style.cssText = 'box-sizing:border-box;width:100%;border:2px solid #4f8ef7;border-radius:8px;padding:8px';
 
 		const textarea = document.createElement('textarea');
@@ -403,8 +416,13 @@ if (!status.editable) {
 
 		const closeEditor = () => {
 			activeEditor = null;
-			editorWrap.remove();
-			renderBlocks();
+			delete cell.dataset.active;
+			cell.style.borderColor = 'transparent';
+			editorWrap.classList.add('ssg-edit-leaving');
+			cell.classList.add('ssg-edit-entering');
+			cell.style.display = '';
+			requestAnimationFrame(() => requestAnimationFrame(() => cell.classList.remove('ssg-edit-entering')));
+			setTimeout(() => editorWrap.remove(), 170);
 		};
 
 		cancelButton.addEventListener('click', closeEditor);
@@ -426,8 +444,10 @@ if (!status.editable) {
 				});
 				const result = await save.json();
 				if (result.ok) {
-					note.textContent = '';
-					window.location.reload();
+					blocks[index] = updated;
+					cell.innerHTML = blockHtml(updated);
+					closeEditor();
+					renderMermaid(cell);
 				} else {
 					note.textContent = 'Save failed: ' + (result.error ?? 'unknown error');
 					saveButton.disabled = false;
@@ -471,7 +491,8 @@ if (!status.editable) {
 			const result = await save.json();
 			if (result.ok) {
 				note.textContent = 'Saved.';
-				window.location.reload();
+				setTimeout(() => { note.textContent = ''; }, 2000);
+				button.disabled = false;
 			} else {
 				note.textContent = 'Save failed: ' + (result.error ?? 'unknown error');
 				button.disabled = false;
