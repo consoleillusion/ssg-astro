@@ -341,6 +341,11 @@ const lowercaseRoutes = {
 
 // https://astro.build/config
 export default defineConfig({
+	devToolbar: {
+		// The served directory is the user's content, and the toolbar's chrome is
+		// noise there — hide it.
+		enabled: false,
+	},
 	integrations: [missingPage, themeStyles, userStyles, menu, mdx(), svelte()],
 	markdown: {
 		processor: satteri({ mdastPlugins: menuEnabled ? [menuMdastPlugin()] : [] }),
