@@ -7,8 +7,10 @@ import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 
 import svelte from '@astrojs/svelte';
+import { satteri } from '@astrojs/markdown-satteri';
 
 import { listPages } from './src/routes.js';
+import { menuMdastPlugin } from './src/menu/satteri.ts';
 
 const notFoundFiles = ['404.astro', '404.html', '404.md', '404.mdx'];
 const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx'];
@@ -74,6 +76,7 @@ const theme = themeNames.includes(requestedTheme)
 
 const userCssPath = (process.env.SSG_CSS_PATH ?? '').trim();
 const userCssRoute = '/astro-ssg-user.css';
+const menuEnabled = process.env.SSG_MENU === '1';
 
 /**
  * Serve the selected theme stylesheet from node_modules and add it to
@@ -141,6 +144,40 @@ if (!document.querySelector('link[data-ssg-css]')) {
 	link.href = ${JSON.stringify(userCssRoute)};
 	link.dataset.ssgCss = 'true';
 	document.head.appendChild(link);
+}
+`
+			);
+		},
+	},
+};
+
+/**
+ * The markup for the --menu page menu is server-rendered (see Menu.astro for
+ * layout-wrapped pages and src/menu/satteri.ts for Markdown pages), so the
+ * toggle works without JavaScript. This integration only adds a progressive
+ * enhancement: closing the menu on outside click or Escape.
+ *
+ * @type {import('astro').AstroIntegration}
+ */
+const menu = {
+	name: 'ssg-menu',
+	hooks: {
+		'astro:config:setup': ({ injectScript }) => {
+			if (!menuEnabled) {
+				return;
+			}
+
+			injectScript(
+				'page',
+				`
+for (const details of document.querySelectorAll('details.ssg-menu')) {
+	const close = () => { details.open = false; };
+	document.addEventListener('click', (event) => {
+		if (!details.contains(event.target)) close();
+	});
+	document.addEventListener('keydown', (event) => {
+		if (event.key === 'Escape') close();
+	});
 }
 `
 			);
@@ -262,6 +299,10 @@ const lowercaseRoutes = {
 
 		const invalidate = () => {
 			routeCache = undefined;
+			// The --menu markup is baked into each page at compile time; pages
+			// must recompile to pick up a newly added or removed page.
+			server.moduleGraph.invalidateAll();
+			server.ws.send({ type: 'full-reload' });
 		};
 
 		server.watcher.on('add', invalidate);
@@ -300,7 +341,10 @@ const lowercaseRoutes = {
 
 // https://astro.build/config
 export default defineConfig({
-	integrations: [missingPage, themeStyles, userStyles, mdx(), svelte()],
+	integrations: [missingPage, themeStyles, userStyles, menu, mdx(), svelte()],
+	markdown: {
+		processor: satteri({ mdastPlugins: menuEnabled ? [menuMdastPlugin()] : [] }),
+	},
 	vite: {
 		plugins: [utf8Html, lowercaseRoutes, userCssReload],
 	},

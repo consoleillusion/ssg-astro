@@ -43,6 +43,7 @@ bunx --bun -p github:consoleillusion/ssg-astro astro-ssg serve
 | `[dir]` | Directory to serve (default: current directory) |
 | `--theme [theme]` | Style every route with a bundled theme stylesheet (see [Themes](#themes); default: `sakura`) |
 | `--css <file>` | Inject a `.css` file into every Astro-rendered page and the built-in default page |
+| `--menu` | Show a page-navigation button in the top-right corner |
 | `--no-default-page` | Do not provide the missing-index page at `/` |
 | `--port <port>` | Port for the dev server |
 | `--host [host]` | Expose the dev server on the network; `--host` alone or a hostname exposes all interfaces |
@@ -109,6 +110,18 @@ nix run github:consoleillusion/ssg-astro#serve -- --css ./theme.css
 ```
 
 A missing or unreadable file is rejected at startup; a file that becomes unreadable afterwards yields HTTP 500 on the stylesheet route.
+
+## Page menu
+
+`--menu` shows a navigation button in the top-right corner of every Astro-rendered page and the built-in default page. Static `.html` pages are served as-is and are not modified. Activating it reveals a list of the directory's navigable pages (the same lowercase, extensionless paths used for links elsewhere); a link to `/` is included when you have an index page. The list is computed at render time, so it reflects the directory as it is — no restart needed. The menu is rendered into the page and is never written to disk. Toggling works without JavaScript, and a small enhancement closes it on Escape or on an outside click when JavaScript is available.
+
+```bash
+# Node CLI
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --menu
+
+# Nix
+nix run github:consoleillusion/ssg-astro#serve -- --menu
+```
 
 ## Disabling the default missing page
 
