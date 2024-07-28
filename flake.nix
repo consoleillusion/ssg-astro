@@ -24,17 +24,23 @@
         name = "init";
         runtimeInputs = [pkgs.rsync];
         text = ''
-          echo "hi"
-          echo "copying from store"
+          echo "copying template to ${cacheDir}"
           mkdir -p ${cacheDir}
-          rsync -rv --delete ${self.packages.${system}.default}/* ${cacheDir}
-          ls 
+          rsync -r --delete ${self.packages.${system}.default}/* ${cacheDir}
+
           curdir=$(pwd)
-          echo "curdir: $curdir"
-          echo "cachedir: ${cacheDir}"
-          echo "ln -s $curdir ${cacheDir}/src/pages"
+          pages_dir="${cacheDir}/src/pages"
+          echo "serving $curdir as $pages_dir"
+
           chmod -R 755 ${cacheDir}
-          ln -s "$curdir" ${cacheDir}/src/pages
+          rm -rf "$pages_dir"
+          ln -s "$curdir" "$pages_dir"
+
+          if [ -e "$curdir/index.astro" ] || [ -e "$curdir/index.md" ] || [ -e "$curdir/index.mdx" ]; then
+            echo "Found an index page; / will render it."
+          else
+            echo "No index.astro, index.md, or index.mdx found; / will show a directory listing."
+          fi
         '';
       };
       serve = pkgs.writeShellApplication {

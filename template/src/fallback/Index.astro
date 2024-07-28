@@ -1,0 +1,127 @@
+---
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { srcDir } from 'astro:config/server';
+import Layout from '../layouts/Layout.astro';
+
+interface PageLink {
+  href: string;
+  label: string;
+}
+
+const pagesDir = fileURLToPath(new URL('pages/', srcDir));
+const pageExtensions = new Set(['.astro', '.md', '.mdx']);
+const ignoredDirectories = new Set(['node_modules', 'dist', '.astro']);
+const visited = new Set<string>();
+
+function collectPages(dir: string, segments: string[] = []): PageLink[] {
+  if (!fs.existsSync(dir)) {
+    return [];
+  }
+
+  const realDir = fs.realpathSync(dir);
+  if (visited.has(realDir)) {
+    return [];
+  }
+  visited.add(realDir);
+
+  const links: PageLink[] = [];
+
+  for (const name of fs.readdirSync(dir)) {
+    if (
+      name.startsWith('.') ||
+      name.startsWith('_') ||
+      name.includes('[') ||
+      name.includes(']') ||
+      ignoredDirectories.has(name)
+    ) {
+      continue;
+    }
+
+    const fullPath = path.join(dir, name);
+    let stats: fs.Stats;
+    try {
+      stats = fs.statSync(fullPath);
+    } catch {
+      continue;
+    }
+
+    if (stats.isDirectory()) {
+      links.push(...collectPages(fullPath, [...segments, name]));
+      continue;
+    }
+
+    if (!stats.isFile()) {
+      continue;
+    }
+
+    const ext = path.extname(name);
+    if (!pageExtensions.has(ext)) {
+      continue;
+    }
+
+    const base = name.slice(0, -ext.length);
+    if (base === 'index') {
+      const route = `/${segments.join('/')}`;
+      links.push({
+        href: route === '/' ? '/' : `${route}/`,
+        label: segments.length > 0 ? segments.join('/') : 'Home',
+      });
+    } else {
+      const route = [...segments, base].join('/');
+      links.push({ href: `/${route}`, label: route });
+    }
+  }
+
+  return links;
+}
+
+const links = collectPages(pagesDir).sort((a, b) => a.label.localeCompare(b.label));
+---
+<Layout>
+  <main>
+    <h1>Pages</h1>
+    <p>No index page was found in the served directory. Available pages:</p>
+    {links.length > 0 ? (
+      <ul>
+        {links.map((link) => (
+          <li><a href={link.href}>{link.label}</a></li>
+        ))}
+      </ul>
+    ) : (
+      <p>No .astro, .md, or .mdx files were found.</p>
+    )}
+  </main>
+</Layout>
+
+<style>
+  main {
+    box-sizing: border-box;
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem;
+    font-family: system-ui, sans-serif;
+    line-height: 1.6;
+  }
+
+  h1 {
+    margin-top: 0;
+  }
+
+  ul {
+    padding-left: 1.25rem;
+  }
+
+  li + li {
+    margin-top: 0.35rem;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  a:hover {
+    text-decoration-thickness: 2px;
+  }
+</style>
