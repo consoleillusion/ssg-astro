@@ -11,7 +11,7 @@ interface PageLink {
 }
 
 const pagesDir = fileURLToPath(new URL('pages/', srcDir));
-const pageExtensions = new Set(['.astro', '.md', '.mdx']);
+const pageExtensions = new Set(['.astro', '.html', '.md', '.mdx']);
 const ignoredDirectories = new Set(['node_modules', 'dist', '.astro']);
 const visited = new Set<string>();
 
@@ -90,7 +90,7 @@ const links = collectPages(pagesDir).sort((a, b) => a.label.localeCompare(b.labe
         ))}
       </ul>
     ) : (
-      <p>No .astro, .md, or .mdx files were found.</p>
+      <p>No .astro, .html, .md, or .mdx files were found.</p>
     )}
   </main>
 </Layout>
