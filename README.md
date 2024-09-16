@@ -22,4 +22,4 @@ Files are routed using Astro's file-based routing:
 
 Only `.astro`, `.html`, `.md`, and `.mdx` files are pages. Other files are ignored by the router. HTML pages are served as-is and do not go through Astro's renderer.
 
-If the directory has no `index.astro`, `index.html`, `index.md`, or `index.mdx`, `/` shows a generated listing of the available pages. If you add an index page while `serve` is running, restart it so Astro stops using the fallback listing.
+`/` requires one of `index.astro`, `index.html`, `index.md`, or `index.mdx`. If none exists, `/` returns 404; no directory listing is generated.
