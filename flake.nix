@@ -24,6 +24,26 @@
         name = "init";
         runtimeInputs = [pkgs.rsync];
         text = ''
+          no_default_page=0
+
+          for arg in "$@"; do
+            case "$arg" in
+              --no-default-page)
+                no_default_page=1
+                ;;
+              -h|--help)
+                echo "Usage: init [--no-default-page]"
+                echo
+                echo "  --no-default-page  Do not provide the missing-index page at /."
+                exit 0
+                ;;
+              *)
+                echo "Unknown argument: $arg" >&2
+                exit 1
+                ;;
+            esac
+          done
+
           echo "copying template to ${cacheDir}"
           mkdir -p ${cacheDir}
           rsync -r --delete ${self.packages.${system}.default}/* ${cacheDir}
@@ -36,10 +56,19 @@
           rm -rf "$pages_dir"
           ln -s "$curdir" "$pages_dir"
 
+          marker="${cacheDir}/.no-default-page"
+          rm -f "$marker"
+
+          if [ "$no_default_page" -eq 1 ]; then
+            : > "$marker"
+          fi
+
           if [ -e "$curdir/index.astro" ] || [ -e "$curdir/index.html" ] || [ -e "$curdir/index.md" ] || [ -e "$curdir/index.mdx" ]; then
             echo "Found an index page; / will serve it."
+          elif [ "$no_default_page" -eq 1 ]; then
+            echo "No index page found; / will return 404 (default page disabled)."
           else
-            echo "No index.astro, index.html, index.md, or index.mdx found; / will return 404."
+            echo "No index page found; / will show a page describing the supported file types."
           fi
         '';
       };
@@ -47,9 +76,34 @@
         name = "serve";
         runtimeInputs = [pkgs.nodejs_24];
         text = ''
+          no_default_page=0
+
+          for arg in "$@"; do
+            case "$arg" in
+              --no-default-page)
+                no_default_page=1
+                ;;
+              -h|--help)
+                echo "Usage: serve [--no-default-page]"
+                echo
+                echo "  --no-default-page  Do not provide the missing-index page at /."
+                exit 0
+                ;;
+              *)
+                echo "Unknown argument: $arg" >&2
+                exit 1
+                ;;
+            esac
+          done
+
           cd ${cacheDir}
           npm install
-          npm run dev
+
+          if [ "$no_default_page" -eq 1 ]; then
+            SSG_NO_DEFAULT_PAGE=1 npm run dev
+          else
+            npm run dev
+          fi
         '';
       };
     };
