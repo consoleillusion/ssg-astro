@@ -2,7 +2,7 @@
 
 Serve a directory of static web files with Astro. Pages can be `.astro`, `.html`, `.md`, or `.mdx`.
 
-Requires Node.js `>= 22.23.4`.
+Requires Node.js `>= 22.23.4`, or Bun.
 
 ## Without Nix
 
@@ -22,7 +22,17 @@ Or, from a clone of this repository:
 
 `init` copies a small Astro project to `~/.cache/astro-ssg` (or `%LOCALAPPDATA%\astro-ssg` on Windows) and links the current directory as its `src/pages` directory. `serve` installs dependencies and starts the Astro dev server. Set `ASTRO_SSG_CACHE` to use a different cache directory.
 
-`serve` accepts `--port`, `--host`, and `--no-default-page`. Running `serve` without `init` initializes the cache for the current directory automatically. If the cache already exists, `serve` serves the directory recorded by `init`; run `init` again to switch directories.
+`serve` accepts `--port`, `--host`, and `--no-default-page`. Running `serve` without `init` initializes the cache for the current directory automatically. If the cache was set up for a different directory, `serve` repoints it to the current directory.
+
+### With Bun
+
+Bun can run the CLI directly without Node.js or npm. `serve` initializes the cache automatically, so one command is enough:
+
+```bash
+bunx --bun -p github:consoleillusion/ssg-astro astro-ssg serve
+```
+
+Use `astro-ssg init` instead of `serve` if you only want to prepare the cache.
 
 ## With Nix
 
