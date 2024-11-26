@@ -4,7 +4,7 @@
   "description": "Serve a directory of Astro, HTML, Markdown, and MDX files.",
   "type": "module",
   "bin": {
-    "astro-ssg": "./bin/astro-ssg.ts"
+    "astro-ssg": "./bin/astro-ssg.js"
   },
   "files": [
     "bin",
