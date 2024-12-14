@@ -13,6 +13,13 @@ npx --yes --package=github:consoleillusion/ssg-astro astro-ssg init
 npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve
 ```
 
+Pass a directory to serve something other than the current directory:
+
+```bash
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg init ./public
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve ./public
+```
+
 Or, from a clone of this repository:
 
 ```bash
@@ -20,9 +27,9 @@ Or, from a clone of this repository:
 ./bin/astro-ssg.js serve
 ```
 
-`init` copies a small Astro project to `~/.cache/astro-ssg` (or `%LOCALAPPDATA%\astro-ssg` on Windows) and links the current directory as its `src/pages` directory. `serve` installs dependencies and starts the Astro dev server. Set `ASTRO_SSG_CACHE` to use a different cache directory.
+`init` copies a small Astro project to `~/.cache/astro-ssg` (or `%LOCALAPPDATA%\astro-ssg` on Windows) and links the given directory (or the current directory) as its `src/pages` directory. `serve` installs dependencies and starts the Astro dev server. Set `ASTRO_SSG_CACHE` to use a different cache directory.
 
-`serve` accepts `--port`, `--host`, and `--no-default-page`. Running `serve` without `init` initializes the cache for the current directory automatically. If the cache was set up for a different directory, `serve` repoints it to the current directory.
+`serve` accepts `--port`, `--host`, and `--no-default-page`. Running `serve` without `init` initializes the cache for the given directory automatically. If the cache was set up for a different directory, `serve` repoints it.
 
 ### With Bun
 
@@ -32,7 +39,7 @@ Bun can run the CLI directly without Node.js or npm. `serve` initializes the cac
 bunx --bun -p github:consoleillusion/ssg-astro astro-ssg serve
 ```
 
-Use `astro-ssg init` instead of `serve` if you only want to prepare the cache.
+Use `astro-ssg init` instead of `serve` if you only want to prepare the cache. Both accept the same optional directory argument as the `npx` commands above.
 
 ## With Nix
 
