@@ -9,8 +9,8 @@ import { cac } from "cac"
 
 /**
  * @typedef {{ version: string }} PackageJson
- * @typedef {{ dir?: string, noDefaultPage: boolean }} InitOptions
- * @typedef {{ dir?: string, noDefaultPage: boolean, port: string | null, host: string | null }} ServeOptions
+ * @typedef {{ dir?: string, noDefaultPage: boolean, classless: boolean }} InitOptions
+ * @typedef {{ dir?: string, noDefaultPage: boolean, classless: boolean, port: string | null, host: string | null }} ServeOptions
  * @typedef {import("node:child_process").SpawnOptions} SpawnOptions
  * @typedef {{
  *   command: string,
@@ -52,6 +52,7 @@ const defaultCacheDir = () =>
 const CACHE_DIR = defaultCacheDir()
 const PAGES_DIR = path.join(CACHE_DIR, "src", "pages")
 const MARKER_PATH = path.join(CACHE_DIR, ".no-default-page")
+const CLASSLESS_MARKER_PATH = path.join(CACHE_DIR, ".classless")
 
 /** @returns {[number, number, number]} */
 const nodeVersionTuple = () =>
@@ -133,6 +134,12 @@ const setDefaultPageMarker = (noDefaultPage) =>
     ? fs.writeFileSync(MARKER_PATH, "")
     : fs.rmSync(MARKER_PATH, { force: true })
 
+/** @param {boolean} classless */
+const setClasslessMarker = (classless) =>
+  classless
+    ? fs.writeFileSync(CLASSLESS_MARKER_PATH, "")
+    : fs.rmSync(CLASSLESS_MARKER_PATH, { force: true })
+
 /** @param {string} serveDir @param {InitOptions} options */
 const initAt = (serveDir, options) =>
   ( assertCacheIsSafe(serveDir)
@@ -145,6 +152,7 @@ const initAt = (serveDir, options) =>
   , fs.symlinkSync(serveDir, PAGES_DIR, process.platform === "win32" ? "junction" : "dir")
   , console.log(`serving ${serveDir} as ${PAGES_DIR}`)
   , setDefaultPageMarker(options.noDefaultPage)
+  , setClasslessMarker(options.classless)
   , console.log(indexMessage(serveDir, options.noDefaultPage))
   , undefined
   )
@@ -233,9 +241,13 @@ const ensureInitialized = (options, serveDir) =>
 
 /** @param {ServeOptions} options @returns {NodeJS.ProcessEnv} */
 const serveEnv = (options) =>
-  options.noDefaultPage
-    ? { ...process.env, SSG_NO_DEFAULT_PAGE: "1" }
+  ( options.noDefaultPage || options.classless
+    ? { ...process.env
+      , ...options.noDefaultPage ? { SSG_NO_DEFAULT_PAGE: "1" } : {}
+      , ...options.classless ? { SSG_CLASSLESS: "1" } : {}
+      }
     : { ...process.env }
+  )
 
 /**
  * @param {PackageManager} manager
@@ -282,22 +294,31 @@ const cli = cac("astro-ssg")
 cli
   .command("init [dir]", "Copy the Astro template to the cache and link [dir] as its src/pages directory")
   .option("--no-default-page", "Do not provide the missing-index page at /")
+  .option("--classless", "Style every route with the Sakura classless stylesheet")
   .action(
-    /** @param {string | undefined} dir @param {{ defaultPage?: boolean }} options */
-    (dir, options) => init({ dir, noDefaultPage: options.defaultPage === false })
+    /** @param {string | undefined} dir @param {{ defaultPage?: boolean, classless?: boolean }} options */
+    (dir, options) =>
+      init
+        ( { dir
+          , noDefaultPage: options.defaultPage === false
+          , classless: options.classless === true
+          }
+        )
   )
 
 cli
   .command("serve [dir]", "Install dependencies and start the Astro dev server for [dir]")
   .option("--no-default-page", "Do not provide the missing-index page at /")
+  .option("--classless", "Style every route with the Sakura classless stylesheet")
   .option("--port <port>", "Port for the dev server")
   .option("--host [host]", "Expose the dev server on the network")
   .action(
-    /** @param {string | undefined} dir @param {{ defaultPage?: boolean, port?: unknown, host?: unknown }} options */
+    /** @param {string | undefined} dir @param {{ defaultPage?: boolean, classless?: boolean, port?: unknown, host?: unknown }} options */
     (dir, options) =>
       serve
         ( { dir
           , noDefaultPage: options.defaultPage === false
+          , classless: options.classless === true
           , port: normalizePort(options.port)
           , host: normalizeHost(options.host)
           }
