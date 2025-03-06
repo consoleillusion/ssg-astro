@@ -1,12 +1,11 @@
----
 interface Props {
 	title?: string;
 }
 
 const { title = 'Astro Basics' } = Astro.props;
 
-// Classless stylesheet
-const classless = Astro.env.SSG_CLASSLESS === '1';
+// Classless stylesheet: injected when SSG_CLASSLESS env var is set via --classless flag
+const classless = process.env.SSG_CLASSLESS === '1';
 
 ---
 
@@ -20,7 +19,7 @@ const classless = Astro.env.SSG_CLASSLESS === '1';
 		<title>{title}</title>
 		<!-- Classless stylesheet -->
 		<link rel="stylesheet" href="/sakura.css" data-ssg-classless={classless} />
-</head>
+	</head>
 	<body>
 		<slot />
 	</body>
