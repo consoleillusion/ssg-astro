@@ -10,6 +10,7 @@ import svelte from '@astrojs/svelte';
 
 const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx'];
 const notFoundFiles = ['404.astro', '404.html', '404.md', '404.mdx'];
+const pageExtensions = ['.astro', '.html', '.md', '.mdx'];
 
 const root = process.cwd();
 const pagesDir = path.join(root, 'src', 'pages');
@@ -90,7 +91,127 @@ if (!document.querySelector('link[data-ssg-classless]')) {
 	},
 };
 
+/**
+ * @param {string} dir
+ * @param {string[]} [segments]
+ * @param {Map<string, { actual: string, priority: number }>} [routes]
+ * @returns {Map<string, { actual: string, priority: number }>}
+ */
+function collectRoutes(dir, segments = [], routes = new Map()) {
+	let entries;
+	try {
+		entries = fs.readdirSync(dir, { withFileTypes: true });
+	} catch {
+		return routes;
+	}
+
+	for (const entry of entries) {
+		const name = entry.name;
+		if (name.startsWith('.') || name.startsWith('_') || name === 'node_modules') {
+			continue;
+		}
+
+		if (entry.isDirectory()) {
+			collectRoutes(path.join(dir, name), [...segments, name], routes);
+			continue;
+		}
+
+		if (!entry.isFile()) {
+			continue;
+		}
+
+		const extension = path.extname(name);
+		const priority = pageExtensions.indexOf(extension);
+		if (priority === -1) {
+			continue;
+		}
+
+		const base = path.basename(name, extension);
+		if (base.includes('[')) {
+			continue;
+		}
+		if (base === '404' && segments.length === 0) {
+			continue;
+		}
+		if (base === 'index' && segments.length === 0) {
+			continue;
+		}
+
+		const isIndex = base === 'index';
+		const parts = isIndex ? segments : [...segments, base];
+		const actual = parts.length === 0 ? '/' : `/${parts.join('/')}${isIndex ? '/' : ''}`;
+		const key = actual.replace(/\/+$/, '').toLowerCase() || '/';
+		const existing = routes.get(key);
+
+		if (!existing || priority < existing.priority) {
+			routes.set(key, { actual, priority });
+		}
+	}
+
+	return routes;
+}
+
+let routeCache;
+
+/** @returns {Map<string, { actual: string, priority: number }>} */
+function routesFor() {
+	routeCache ??= collectRoutes(pagesDir);
+	return routeCache;
+}
+
+/**
+ * Rewrite lowercase URLs to the case-preserving route Astro generates.
+ * This keeps links extensionless and lowercase while matching files such as
+ * README.md, About.astro, or docs/Getting-Started.md.
+ *
+ * @type {import('vite').Plugin}
+ */
+const lowercaseRoutes = {
+	name: 'ssg-lowercase-routes',
+	enforce: 'pre',
+	configureServer(server) {
+		const invalidate = () => {
+			routeCache = undefined;
+		};
+
+		server.watcher.on('add', invalidate);
+		server.watcher.on('unlink', invalidate);
+		server.watcher.on('addDir', invalidate);
+		server.watcher.on('unlinkDir', invalidate);
+
+		server.middlewares.use((req, _res, next) => {
+			if (!req.url) {
+				return next();
+			}
+
+			const [rawPath, query] = req.url.split('?');
+			let decoded;
+			try {
+				decoded = decodeURIComponent(rawPath);
+			} catch {
+				return next();
+			}
+
+			const normalized =
+				decoded.length > 1 ? decoded.replace(/\/+$/, '') || '/' : decoded;
+			if (normalized !== normalized.toLowerCase()) {
+				return next();
+			}
+
+			const route = routesFor().get(normalized.toLowerCase());
+			if (route && route.actual !== decoded) {
+				req.url = encodeURI(route.actual) + (query ? `?${query}` : '');
+			}
+
+			next();
+		});
+	},
+};
+
 // https://astro.build/config
 export default defineConfig({
 	integrations: [missingPage, classlessStyles, mdx(), svelte()],
+	vite: {
+		plugins: [lowercaseRoutes],
+	},
 });
