@@ -113,6 +113,12 @@ const pages = isRoot
 						page.
 					</p>
 					<p>Add one of these files to create the home page:</p>
+					<ul class="files">
+						<li><code>index.astro</code></li>
+						<li><code>index.html</code></li>
+						<li><code>index.md</code></li>
+						<li><code>index.mdx</code></li>
+					</ul>
 				</>
 			) : (
 				<>
@@ -120,17 +126,9 @@ const pages = isRoot
 					<p>
 						No page exists at <code>{pathname}</code>.
 					</p>
-					<p>The home page needs one of these files:</p>
 				</>
 			)
 		}
-
-		<ul class="files">
-			<li><code>index.astro</code></li>
-			<li><code>index.html</code></li>
-			<li><code>index.md</code></li>
-			<li><code>index.mdx</code></li>
-		</ul>
 
 		<p>This server only serves these page file types:</p>
 		<ul class="files">

@@ -8,23 +8,20 @@ import mdx from '@astrojs/mdx';
 
 import svelte from '@astrojs/svelte';
 
-const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx'];
 const notFoundFiles = ['404.astro', '404.html', '404.md', '404.mdx'];
 const pageExtensions = ['.astro', '.html', '.md', '.mdx'];
 
 const root = process.cwd();
 const pagesDir = path.join(root, 'src', 'pages');
 
-const hasIndexPage = indexFiles.some((file) => fs.existsSync(path.join(pagesDir, file)));
 const has404Page = notFoundFiles.some((file) => fs.existsSync(path.join(pagesDir, file)));
 const defaultPageDisabled =
 	process.env.SSG_NO_DEFAULT_PAGE === '1' ||
 	fs.existsSync(path.join(root, '.no-default-page'));
 
 /**
- * Show a helpful 404 page when the served directory has no index page.
- * It describes the supported file types and links to the pages that exist,
- * without listing non-page files.
+ * Show a helpful 404 page that describes the supported file types and, when
+ * the directory has no index page, links to the pages that do exist.
  *
  * @type {import('astro').AstroIntegration}
  */
@@ -32,7 +29,7 @@ const missingPage = {
 	name: 'ssg-missing-page',
 	hooks: {
 		'astro:config:setup': ({ injectRoute }) => {
-			if (defaultPageDisabled || hasIndexPage) {
+			if (defaultPageDisabled) {
 				return;
 			}
 
