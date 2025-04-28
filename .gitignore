@@ -1,3 +1,4 @@
 .ssg
 result
 template/node_modules
+template/src/pages
