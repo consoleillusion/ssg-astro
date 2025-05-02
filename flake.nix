@@ -25,24 +25,49 @@
         runtimeInputs = [pkgs.rsync];
         text = ''
           no_default_page=0
+          classless=""
 
-          for arg in "$@"; do
-            case "$arg" in
+          while [ $# -gt 0 ]; do
+            case "$1" in
               --no-default-page)
                 no_default_page=1
+                shift
+                ;;
+              --classless)
+                if [ $# -gt 1 ] && [ "''${2#-}" = "$2" ]; then
+                  classless="$2"
+                  shift 2
+                else
+                  classless="sakura"
+                  shift
+                fi
+                ;;
+              --classless=*)
+                classless="''${1#--classless=}"
+                shift
                 ;;
               -h|--help)
-                echo "Usage: init [--no-default-page]"
+                echo "Usage: init [--no-default-page] [--classless [theme]]"
                 echo
                 echo "  --no-default-page  Do not provide the missing-index page at /."
+                echo "  --classless        Style every route with a classless stylesheet."
+                echo "                     Themes: sakura (default), milligram, skeleton."
                 exit 0
                 ;;
               *)
-                echo "Unknown argument: $arg" >&2
+                echo "Unknown argument: $1" >&2
                 exit 1
                 ;;
             esac
           done
+
+          case "$classless" in
+            ""|sakura|milligram|skeleton) ;;
+            *)
+              echo "Unknown classless theme \"$classless\". Choose one of: sakura, milligram, skeleton." >&2
+              exit 1
+              ;;
+          esac
 
           echo "copying template to ${cacheDir}"
           mkdir -p ${cacheDir}
@@ -63,6 +88,13 @@
             : > "$marker"
           fi
 
+          classless_marker="${cacheDir}/.classless"
+          rm -f "$classless_marker"
+
+          if [ -n "$classless" ]; then
+            printf '%s' "$classless" > "$classless_marker"
+          fi
+
           if [ -e "$curdir/index.astro" ] || [ -e "$curdir/index.html" ] || [ -e "$curdir/index.md" ] || [ -e "$curdir/index.mdx" ]; then
             echo "Found an index page; / will serve it."
           elif [ "$no_default_page" -eq 1 ]; then
@@ -77,33 +109,72 @@
         runtimeInputs = [pkgs.nodejs_24];
         text = ''
           no_default_page=0
+          no_default_page_set=0
+          classless=""
 
-          for arg in "$@"; do
-            case "$arg" in
+          while [ $# -gt 0 ]; do
+            case "$1" in
               --no-default-page)
                 no_default_page=1
+                no_default_page_set=1
+                shift
+                ;;
+              --classless)
+                if [ $# -gt 1 ] && [ "''${2#-}" = "$2" ]; then
+                  classless="$2"
+                  shift 2
+                else
+                  classless="sakura"
+                  shift
+                fi
+                ;;
+              --classless=*)
+                classless="''${1#--classless=}"
+                shift
                 ;;
               -h|--help)
-                echo "Usage: serve [--no-default-page]"
+                echo "Usage: serve [--no-default-page] [--classless [theme]]"
                 echo
                 echo "  --no-default-page  Do not provide the missing-index page at /."
+                echo "  --classless        Style every route with a classless stylesheet."
+                echo "                     Themes: sakura (default), milligram, skeleton."
                 exit 0
                 ;;
               *)
-                echo "Unknown argument: $arg" >&2
+                echo "Unknown argument: $1" >&2
                 exit 1
                 ;;
             esac
           done
 
+          if [ -z "$classless" ] && [ -f "${cacheDir}/.classless" ]; then
+            classless=$(cat "${cacheDir}/.classless")
+          fi
+
+          case "$classless" in
+            ""|sakura|milligram|skeleton) ;;
+            *)
+              echo "Unknown classless theme \"$classless\". Choose one of: sakura, milligram, skeleton." >&2
+              exit 1
+              ;;
+          esac
+
+          if [ "$no_default_page_set" -eq 0 ] && [ -e "${cacheDir}/.no-default-page" ]; then
+            no_default_page=1
+          fi
+
           cd ${cacheDir}
           npm install
 
           if [ "$no_default_page" -eq 1 ]; then
-            SSG_NO_DEFAULT_PAGE=1 npm run dev
-          else
-            npm run dev
+            export SSG_NO_DEFAULT_PAGE=1
           fi
+
+          if [ -n "$classless" ]; then
+            export SSG_CLASSLESS="$classless"
+          fi
+
+          npm run dev
         '';
       };
     };
