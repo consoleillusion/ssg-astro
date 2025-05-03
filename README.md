@@ -29,7 +29,7 @@ Or, from a clone of this repository:
 
 `init` copies a small Astro project to `~/.cache/astro-ssg` (or `%LOCALAPPDATA%\astro-ssg` on Windows) and links the given directory (or the current directory) as its `src/pages` directory. `serve` installs dependencies and starts the Astro dev server. Set `ASTRO_SSG_CACHE` to use a different cache directory.
 
-`serve` accepts `--port`, `--host`, and `--no-default-page`. Running `serve` without `init` initializes the cache for the given directory automatically. If the cache was set up for a different directory, `serve` repoints it.
+`serve` accepts `--port`, `--host`, `--no-default-page`, and `--classless [theme]`. Running `serve` without `init` initializes the cache for the given directory automatically. If the cache was set up for a different directory, `serve` repoints it.
 
 ### With Bun
 
@@ -67,7 +67,25 @@ Files are routed using Astro's file-based routing:
 
 Only `.astro`, `.html`, `.md`, and `.mdx` files are pages. Other files are ignored by the router. HTML pages are served as-is and do not go through Astro's renderer.
 
-`/` requires one of `index.astro`, `index.html`, `index.md`, or `index.mdx`. If none exists, `/` serves a helpful missing page (with HTTP status 404) that explains which files are recognized and links to the other pages that do exist. It does not list non-page files. A `404.astro`, `404.html`, `404.md`, or `404.mdx` in the served directory takes precedence. If you add an index page while `serve` is running, restart it.
+Pages are linked with lowercase, extensionless paths, so `README.md` is linked as `/readme` and `docs/Getting-Started.md` as `/docs/getting-started`. Lowercase URLs are accepted for those pages.
+
+`/` requires one of `index.astro`, `index.html`, `index.md`, or `index.mdx`. If none exists, `astro-ssg` generates an `index.html` that returns HTTP status 200. It explains which files are recognized and links to the other pages that exist. Paths in the generated page are lowercase and extensionless, and it does not list non-page files. When several files map to the same path, the extension priority is `.astro`, then `.html`, `.md`, and `.mdx`. A `404.astro`, `404.html`, `404.md`, or `404.mdx` in the served directory takes precedence. If you add your own index page, the generated page is removed. If you add one while `serve` is running, restart it.
+
+## Classless stylesheets
+
+`--classless` applies a classless stylesheet to Astro-rendered pages (`.astro`, `.md`, and `.mdx`) and to the generated default page. Static `.html` pages are served as-is and are not modified. It accepts `sakura`, `milligram`, or `skeleton`; without a value it uses `sakura`. The theme's CSS comes from the installed package and is served at `/<theme>.css`. The choice is saved during `init` and reused by `serve`:
+
+```bash
+# Node CLI
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg init --classless milligram
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve
+
+# Nix
+nix run github:consoleillusion/ssg-astro#init -- --classless milligram
+nix run github:consoleillusion/ssg-astro#serve
+```
+
+Pass `--classless <theme>` to `serve` to override the saved theme for one run. Unknown theme names are rejected.
 
 ## Disabling the default missing page
 
