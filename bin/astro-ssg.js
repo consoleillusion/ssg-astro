@@ -6,6 +6,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { cac } from "cac"
+import { listPages } from "../template/src/routes.js"
 
 /**
  * @typedef {{ version: string }} PackageJson
@@ -31,13 +32,11 @@ const packageJson = /** @type {PackageJson} */ (
 const MINIMUM_NODE = [22, 23, 4]
 /** @type {readonly string[]} */
 const INDEX_FILES = ["index.astro", "index.html", "index.md", "index.mdx"]
-/** Page extensions in priority order; the first match wins for a route. */
-const PAGE_EXTENSIONS = [".astro", ".html", ".md", ".mdx"]
 /** @type {readonly ClasslessTheme[]} */
 const CLASSLESS_THEMES = ["sakura", "milligram", "skeleton"]
 const DEFAULT_CLASSLESS_THEME = "sakura"
 const GENERATED_INDEX_MARKER = "<!-- astro-ssg:generated-index -->"
-const TEMPLATE_VERSION = "2"
+const TEMPLATE_VERSION = "3"
 const RUNNING_WITH_BUN = Boolean(process.versions.bun)
 
 /** @param {string} message @returns {never} */
@@ -192,81 +191,6 @@ const readClasslessMarker = () => {
   }
 }
 
-/**
- * List the page routes Astro serves, with lowercase, extensionless paths.
- * When several files map to the same route, PAGE_EXTENSIONS decides the winner.
- *
- * @param {string} serveDir
- * @returns {{ path: string, href: string, file: string }[]}
- */
-const listPageRoutes = (serveDir) => {
-  /** @type {Map<string, { path: string, file: string, priority: number }>} */
-  const routes = new Map()
-
-  /** @param {string} dir @param {string[]} [segments] */
-  const walk = (dir, segments = []) => {
-    /** @type {import("node:fs").Dirent[]} */
-    let entries
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-
-    for (const entry of entries) {
-      const name = entry.name
-      if (name.startsWith(".") || name.startsWith("_") || name === "node_modules") continue
-
-      if (entry.isDirectory()) {
-        walk(path.join(dir, name), [...segments, name])
-        continue
-      }
-      if (!entry.isFile()) continue
-
-      const extension = path.extname(name)
-      const priority = PAGE_EXTENSIONS.indexOf(extension)
-      if (priority === -1) continue
-
-      const base = path.basename(name, extension)
-      if (base.includes("[")) continue
-      if (base === "404" && segments.length === 0) continue
-      if (base === "index" && segments.length === 0) continue
-
-      const isIndex = base === "index"
-      const routeSegments = isIndex ? segments : [...segments, base]
-      const route =
-        routeSegments.length === 0
-          ? "/"
-          : `/${routeSegments.join("/")}${isIndex ? "/" : ""}`
-      const key = route.toLowerCase()
-      const existing = routes.get(key)
-      if (!existing || priority < existing.priority) {
-        routes.set(key, {
-          path: key,
-          file: [...segments, name].join("/"),
-          priority,
-        })
-      }
-    }
-  }
-
-  walk(serveDir)
-
-  return [...routes.values()]
-    .sort((a, b) => a.path.localeCompare(b.path))
-    .map(({ path: pagePath, file }) => {
-      const href =
-        pagePath === "/"
-          ? "/"
-          : `/${pagePath
-              .split("/")
-              .filter(Boolean)
-              .map(encodeURIComponent)
-              .join("/")}${pagePath.endsWith("/") ? "/" : ""}`
-      return { path: pagePath, href, file }
-    })
-}
-
 /** @param {string} serveDir @param {InitOptions} options */
 const writeDefaultIndex = (serveDir, options) => {
   const generatedPath = path.join(serveDir, "index.html")
@@ -287,9 +211,9 @@ const writeDefaultIndex = (serveDir, options) => {
     return
   }
 
-  const pages = listPageRoutes(serveDir)
+  const pages = listPages(serveDir)
   const links = pages
-    .map(({ path: pagePath, href }) => `<li><a href="${href}">${pagePath}</a></li>`)
+    .map(({ path: pagePath, url }) => `<li><a href="${url}">${pagePath}</a></li>`)
     .join("\n")
   const pageList =
     pages.length > 0
