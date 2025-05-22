@@ -6,6 +6,8 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { cac } from "cac"
+import { compareVersions } from "compare-versions"
+
 import { listPages } from "../template/src/routes.js"
 
 /**
@@ -28,8 +30,7 @@ const packageJson = /** @type {PackageJson} */ (
   JSON.parse(fs.readFileSync(path.join(packageRoot, "package.json"), "utf8"))
 )
 
-/** @type {readonly [number, number, number]} */
-const MINIMUM_NODE = [22, 23, 4]
+const MINIMUM_NODE = "22.23.4"
 /** @type {readonly string[]} */
 const INDEX_FILES = ["index.astro", "index.html", "index.md", "index.mdx"]
 /** @type {readonly ClasslessTheme[]} */
@@ -62,25 +63,10 @@ const MARKER_PATH = path.join(CACHE_DIR, ".no-default-page")
 const CLASSLESS_MARKER_PATH = path.join(CACHE_DIR, ".classless")
 const TEMPLATE_VERSION_PATH = path.join(CACHE_DIR, ".template-version")
 
-/** @returns {[number, number, number]} */
-const nodeVersionTuple = () =>
-  (([major = 0, minor = 0, patch = 0]) => [major, minor, patch])(
-    process.versions.node.split(".").map(Number)
-  )
-
-const isNodeSupported = () =>
-  (([major, minor, patch]) =>
-    (([requiredMajor, requiredMinor, requiredPatch]) =>
-      major > requiredMajor ||
-      (major === requiredMajor &&
-        (minor > requiredMinor || (minor === requiredMinor && patch >= requiredPatch)))
-    )(MINIMUM_NODE)
-  )(nodeVersionTuple())
-
 const checkNodeVersion = () =>
-  RUNNING_WITH_BUN || isNodeSupported()
+  RUNNING_WITH_BUN || compareVersions(process.versions.node, MINIMUM_NODE) >= 0
     ? undefined
-    : fail(`Node.js ${MINIMUM_NODE.join(".")} or newer is required; found ${process.versions.node}.`)
+    : fail(`Node.js ${MINIMUM_NODE} or newer is required; found ${process.versions.node}.`)
 
 /** @param {string | undefined} dir @returns {string} */
 const resolveServeDir = (dir) => {
