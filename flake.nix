@@ -39,7 +39,7 @@
       };
       serve = pkgs.writeShellApplication {
         name = "serve";
-        runtimeInputs = [pkgs.nodejs];
+        runtimeInputs = [pkgs.nodejs_24];
         text = ''
           cd ${cacheDir}
           npm install
