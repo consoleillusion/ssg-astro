@@ -7,7 +7,7 @@ import mdx from '@astrojs/mdx';
 import svelte from '@astrojs/svelte';
 
 const pagesDir = new URL('./src/pages/', import.meta.url);
-const hasIndexPage = ['index.astro', 'index.md', 'index.mdx'].some((file) =>
+const hasIndexPage = ['index.astro', 'index.html', 'index.md', 'index.mdx'].some((file) =>
   fs.existsSync(new URL(file, pagesDir))
 );
 

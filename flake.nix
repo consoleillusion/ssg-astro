@@ -36,10 +36,10 @@
           rm -rf "$pages_dir"
           ln -s "$curdir" "$pages_dir"
 
-          if [ -e "$curdir/index.astro" ] || [ -e "$curdir/index.md" ] || [ -e "$curdir/index.mdx" ]; then
-            echo "Found an index page; / will render it."
+          if [ -e "$curdir/index.astro" ] || [ -e "$curdir/index.html" ] || [ -e "$curdir/index.md" ] || [ -e "$curdir/index.mdx" ]; then
+            echo "Found an index page; / will serve it."
           else
-            echo "No index.astro, index.md, or index.mdx found; / will show a directory listing."
+            echo "No index.astro, index.html, index.md, or index.mdx found; / will show a directory listing."
           fi
         '';
       };
