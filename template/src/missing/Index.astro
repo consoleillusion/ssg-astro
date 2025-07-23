@@ -1,0 +1,68 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
+const isRoot = pathname === '/';
+---
+<Layout title={isRoot ? 'No index page found' : 'Page not found'}>
+	<main>
+		{
+			isRoot ? (
+				<>
+					<h1>No index page found</h1>
+					<p>
+						Nothing is served at <code>/</code> because this directory has no index
+						page.
+					</p>
+					<p>Add one of these files to create the home page:</p>
+				</>
+			) : (
+				<>
+					<h1>Page not found</h1>
+					<p>
+						No page exists at <code>{pathname}</code>.
+					</p>
+					<p>The home page needs one of these files:</p>
+				</>
+			)
+		}
+
+		<ul class="files">
+			<li><code>index.astro</code></li>
+			<li><code>index.html</code></li>
+			<li><code>index.md</code></li>
+			<li><code>index.mdx</code></li>
+		</ul>
+
+		<p>This server only serves these page file types:</p>
+		<ul class="files">
+			<li><code>.astro</code></li>
+			<li><code>.html</code></li>
+			<li><code>.md</code></li>
+			<li><code>.mdx</code></li>
+		</ul>
+	</main>
+</Layout>
+
+<style>
+	main {
+		box-sizing: border-box;
+		max-width: 42rem;
+		margin: 0 auto;
+		padding: 3rem 1.5rem;
+		font-family: system-ui, sans-serif;
+		line-height: 1.6;
+	}
+
+	h1 {
+		margin-top: 0;
+	}
+
+	.files {
+		padding-left: 1.25rem;
+	}
+
+	.files li + li {
+		margin-top: 0.25rem;
+	}
+</style>
