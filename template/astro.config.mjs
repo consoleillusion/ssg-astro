@@ -16,6 +16,9 @@ const pagesDir = path.join(root, 'src', 'pages');
 
 const hasIndexPage = indexFiles.some((file) => fs.existsSync(path.join(pagesDir, file)));
 const has404Page = notFoundFiles.some((file) => fs.existsSync(path.join(pagesDir, file)));
+const defaultPageDisabled =
+	process.env.SSG_NO_DEFAULT_PAGE === '1' ||
+	fs.existsSync(path.join(root, '.no-default-page'));
 
 /**
  * Show a helpful 404 page when the served directory has no index page.
@@ -27,7 +30,7 @@ const missingPage = {
 	name: 'ssg-missing-page',
 	hooks: {
 		'astro:config:setup': ({ injectRoute }) => {
-			if (hasIndexPage) {
+			if (defaultPageDisabled || hasIndexPage) {
 				return;
 			}
 
