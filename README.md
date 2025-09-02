@@ -54,13 +54,13 @@ Run `astro-ssg serve --help` for the exact interface.
 nix run github:consoleillusion/ssg-astro#serve
 ```
 
-Pass any arguments after `--`; they are handed to the same Node CLI as `astro-ssg serve`, so Nix accepts exactly the same interface:
+Pass any arguments after `--`; they are handed to the same CLI as `astro-ssg serve`, so Nix accepts exactly the same interface:
 
 ```bash
 nix run github:consoleillusion/ssg-astro#serve -- --classless milligram ./public --port 3000
 ```
 
-The Nix app is a thin wrapper around `astro-ssg serve` (Node.js from nixpkgs). The cache defaults to `~/.cache/astro-ssg`; set `ASTRO_SSG_CACHE` to override it.
+The Nix app is a thin wrapper around `astro-ssg serve` (Bun from nixpkgs). The cache defaults to `~/.cache/astro-ssg`; set `ASTRO_SSG_CACHE` to override it.
 
 ## Routing
 
