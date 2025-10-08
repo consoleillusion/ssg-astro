@@ -5,3 +5,5 @@ template/src/pages
 
 node_modules/
 *.tgz
+*.swp
+/index.html
