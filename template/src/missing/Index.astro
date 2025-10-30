@@ -11,15 +11,15 @@ const pages = isRoot
 	? listPages(pagesDir).sort((a, b) => a.url.localeCompare(b.url))
 	: [];
 ---
-<Layout title={isRoot ? 'No index page found' : 'Page not found'}>
+<Layout title={isRoot ? 'Default page' : 'Page not found'}>
 	<main>
 		{
 			isRoot ? (
 				<>
-					<h1>No index page found</h1>
+					<h1>Default page served</h1>
 					<p>
-						Nothing is served at <code>/</code> because this directory has no index
-						page.
+						No index page was found in this directory, so this default page is served
+						with HTTP status 200.
 					</p>
 					<p>Add one of these files to create the home page:</p>
 					<ul class="files">
