@@ -2,3 +2,6 @@
 result
 template/node_modules
 template/src/pages
+
+node_modules/
+*.tgz
