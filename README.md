@@ -42,6 +42,7 @@ bunx --bun -p github:consoleillusion/ssg-astro astro-ssg serve
 | :--- | :---------- |
 | `[dir]` | Directory to serve (default: current directory) |
 | `--classless [theme]` | Style every route with a classless stylesheet: `sakura` (default), `milligram`, or `skeleton` |
+| `--css <file>` | Inject a `.css` file into every Astro-rendered page and the built-in default page |
 | `--no-default-page` | Do not provide the missing-index page at `/` |
 | `--port <port>` | Port for the dev server |
 | `--host [host]` | Expose the dev server on the network; `--host` alone or a hostname exposes all interfaces |
@@ -94,6 +95,20 @@ nix run github:consoleillusion/ssg-astro#serve -- --classless milligram
 ```
 
 Unknown theme names are rejected.
+
+## Custom stylesheet
+
+`--css <file>` injects a `.css` file into every Astro-rendered page (`.astro`, `.md`, and `.mdx`) and the built-in default page. Static `.html` pages are served as-is and are not modified. The file path is resolved against the current directory; the file is served by the dev server at `/astro-ssg-user.css` and is re-read from disk on every request, so editing it does not require a restart or a rebuild. It can be combined with `--classless`; the custom stylesheet is loaded after the classless one and wins on equal specificity.
+
+```bash
+# Node CLI
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --css ./theme.css
+
+# Nix
+nix run github:consoleillusion/ssg-astro#serve -- --css ./theme.css
+```
+
+A missing or unreadable file is rejected at startup; a file that becomes unreadable afterwards yields HTTP 500 on the stylesheet route.
 
 ## Disabling the default missing page
 

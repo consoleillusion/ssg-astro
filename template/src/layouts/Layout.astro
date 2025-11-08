@@ -7,6 +7,9 @@ const { title = 'Astro Basics' } = Astro.props;
 
 // Classless stylesheet theme, set by `astro-ssg serve --classless <theme>`.
 const classless = process.env.SSG_CLASSLESS ?? '';
+// User stylesheet, set by `astro-ssg serve --css <file>`. Loaded after the
+// classless stylesheet so it wins on equal specificity.
+const userCss = process.env.SSG_CSS_PATH ? '/astro-ssg-user.css' : '';
 ---
 
 <!doctype html>
@@ -22,6 +25,13 @@ const classless = process.env.SSG_CLASSLESS ?? '';
 				rel="stylesheet"
 				href={`/${classless}.css`}
 				data-ssg-classless={classless}
+			/>
+		)}
+		{userCss && (
+			<link
+				rel="stylesheet"
+				href={userCss}
+				data-ssg-css
 			/>
 		)}
 	</head>
