@@ -5,26 +5,26 @@ interface Props {
 
 const { title = 'Astro Basics' } = Astro.props;
 
-// Classless stylesheet theme, set by `astro-ssg serve --classless <theme>`.
-const classless = process.env.SSG_CLASSLESS ?? '';
+// Theme stylesheet, set by `astro-ssg serve --theme <theme>`.
+const theme = process.env.SSG_THEME ?? '';
 // User stylesheet, set by `astro-ssg serve --css <file>`. Loaded after the
-// classless stylesheet so it wins on equal specificity.
+// theme stylesheet so it wins on equal specificity.
 const userCss = process.env.SSG_CSS_PATH ? '/astro-ssg-user.css' : '';
 ---
 
 <!doctype html>
-<html lang="en" class={classless ? undefined : 'ssg-reset'}>
+<html lang="en" class={theme ? undefined : 'ssg-reset'}>
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
-		{classless && (
+		{theme && (
 			<link
 				rel="stylesheet"
-				href={`/${classless}.css`}
-				data-ssg-classless={classless}
+				href={`/${theme}.css`}
+				data-ssg-theme={theme}
 			/>
 		)}
 		{userCss && (

@@ -41,7 +41,7 @@ bunx --bun -p github:consoleillusion/ssg-astro astro-ssg serve
 | Flag | Description |
 | :--- | :---------- |
 | `[dir]` | Directory to serve (default: current directory) |
-| `--classless [theme]` | Style every route with a classless stylesheet: `sakura` (default), `milligram`, or `skeleton` |
+| `--theme [theme]` | Style every route with a bundled theme stylesheet (see [Themes](#themes); default: `sakura`) |
 | `--css <file>` | Inject a `.css` file into every Astro-rendered page and the built-in default page |
 | `--no-default-page` | Do not provide the missing-index page at `/` |
 | `--port <port>` | Port for the dev server |
@@ -58,7 +58,7 @@ nix run github:consoleillusion/ssg-astro#serve
 Pass any arguments after `--`; they are handed to the same CLI as `astro-ssg serve`, so Nix accepts exactly the same interface:
 
 ```bash
-nix run github:consoleillusion/ssg-astro#serve -- --classless milligram ./public --port 3000
+nix run github:consoleillusion/ssg-astro#serve -- --theme milligram ./public --port 3000
 ```
 
 The Nix app is a thin wrapper around `astro-ssg serve` (Bun from nixpkgs). The cache defaults to `~/.cache/astro-ssg`; set `ASTRO_SSG_CACHE` to override it.
@@ -82,23 +82,23 @@ Pages are linked with lowercase, extensionless paths, so `README.md` is linked a
 
 `/` requires one of `index.astro`, `index.html`, `index.md`, or `index.mdx`. If none exists, `astro-ssg` serves a built-in default page at `/` with HTTP status 200. It explains which files are recognized and links to the other pages that exist. Paths in the default page are lowercase and extensionless, and it does not list non-page files. The default page is rendered from the cache — no file is written to or removed from the served directory. When several files map to the same path, the extension priority is `.astro`, then `.html`, `.md`, and `.mdx`. A `404.astro`, `404.html`, `404.md`, or `404.mdx` in the served directory takes precedence. If you add your own index page, restart `serve` and it will be used instead. Earlier versions of `astro-ssg` generated an `index.html` inside the served directory (it contains `<!-- astro-ssg:generated-index -->`); if one is present it is left untouched and keeps being served at `/`. Delete it manually if you want the built-in default page instead.
 
-## Classless stylesheets
+## Themes
 
-`--classless` applies a classless stylesheet to Astro-rendered pages (`.astro`, `.md`, and `.mdx`) and to the built-in default page. Static `.html` pages are served as-is and are not modified. It accepts `sakura`, `milligram`, or `skeleton`; without a value it uses `sakura`. The theme's CSS comes from the installed package and is served at `/<theme>.css`.
+`--theme` applies a theme stylesheet to Astro-rendered pages (`.astro`, `.md`, and `.mdx`) and the built-in default page. Static `.html` pages are served as-is and are not modified. It accepts `sakura`, `sakura-dark`, `sakura-dark-solarized`, `sakura-earthly`, `sakura-ink`, `sakura-pink`, `sakura-radical`, `sakura-vader`, `milligram`, or `skeleton`; without a value it uses `sakura`. The sakura-family stylesheets come from the `sakura.css` package and each theme's CSS is served at `/<theme>.css`. (`--theme` was named `--classless` in earlier versions.)
 
 ```bash
 # Node CLI
-npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --classless milligram
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --theme sakura-dark
 
 # Nix
-nix run github:consoleillusion/ssg-astro#serve -- --classless milligram
+nix run github:consoleillusion/ssg-astro#serve -- --theme sakura-dark
 ```
 
 Unknown theme names are rejected.
 
 ## Custom stylesheet
 
-`--css <file>` injects a `.css` file into every Astro-rendered page (`.astro`, `.md`, and `.mdx`) and the built-in default page. Static `.html` pages are served as-is and are not modified. The file path is resolved against the current directory; the file is served by the dev server at `/astro-ssg-user.css` and is re-read from disk on every request. The file is watched by the dev server, and connected pages reload automatically when it changes. It can be combined with `--classless`; the custom stylesheet is loaded after the classless one and wins on equal specificity.
+`--css <file>` injects a `.css` file into every Astro-rendered page (`.astro`, `.md`, and `.mdx`) and the built-in default page. Static `.html` pages are served as-is and are not modified. The file path is resolved against the current directory; the file is served by the dev server at `/astro-ssg-user.css` and is re-read from disk on every request. The file is watched by the dev server, and connected pages reload automatically when it changes. It can be combined with `--theme`; the custom stylesheet is loaded after the theme one and wins on equal specificity.
 
 ```bash
 # Node CLI
