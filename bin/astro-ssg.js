@@ -11,6 +11,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.j
 
 const MINIMUM_NODE = [22, 23, 4];
 const INDEX_FILES = ['index.astro', 'index.html', 'index.md', 'index.mdx'];
+const RUNNING_WITH_BUN = Boolean(process.versions.bun);
 
 function fail(message) {
 	console.error(`astro-ssg: ${message}`);
@@ -40,6 +41,8 @@ function help() {
 
 Serve a directory of Astro, HTML, Markdown, and MDX files.
 
+Requires Node.js ${MINIMUM_NODE.join('.')} or newer, or Bun.
+
 Usage:
   astro-ssg init [--no-default-page]
   astro-ssg serve [--no-default-page] [--port <port>] [--host [host]]
@@ -62,6 +65,10 @@ Cache:
 }
 
 function checkNodeVersion() {
+	if (RUNNING_WITH_BUN) {
+		return;
+	}
+
 	const current = process.versions.node.split('.').map(Number);
 	const [major, minor, patch] = current;
 	const [requiredMajor, requiredMinor, requiredPatch] = MINIMUM_NODE;
@@ -190,6 +197,26 @@ function init(options) {
 	}
 }
 
+function packageManager() {
+	if (RUNNING_WITH_BUN) {
+		return {
+			command: process.execPath,
+			installArgs: ['install'],
+			devArgs: (astroArgs) => ['run', 'dev', ...astroArgs],
+			shell: false,
+		};
+	}
+
+	const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+	return {
+		command: npm,
+		installArgs: ['install', '--no-audit', '--no-fund'],
+		devArgs: (astroArgs) =>
+			astroArgs.length > 0 ? ['run', 'dev', '--', ...astroArgs] : ['run', 'dev'],
+		shell: process.platform === 'win32',
+	};
+}
+
 function run(command, args, options = {}) {
 	return new Promise((resolve, reject) => {
 		const child = spawn(command, args, {
@@ -217,13 +244,12 @@ async function serve(options) {
 		const linkedDir = fs.realpathSync(PAGES_DIR);
 
 		if (serveDir !== linkedDir) {
-			fail(
-				`The cache is configured to serve ${linkedDir}. Run "astro-ssg init" from the directory you want to serve, or set ASTRO_SSG_CACHE to a different cache.`,
-			);
+			console.log(`Cache is configured for ${linkedDir}; serving ${serveDir} instead.`);
+			init(options);
 		}
 	}
 
-	const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+	const manager = packageManager();
 	const env = { ...process.env };
 
 	if (options.noDefaultPage) {
@@ -231,9 +257,10 @@ async function serve(options) {
 	}
 
 	console.log('installing dependencies');
-	let exitCode = await run(npm, ['install', '--no-audit', '--no-fund'], {
+	let exitCode = await run(manager.command, manager.installArgs, {
 		cwd: CACHE_DIR,
 		env,
+		shell: manager.shell,
 	});
 
 	if (exitCode !== 0) {
@@ -249,14 +276,10 @@ async function serve(options) {
 		astroArgs.push('--host', options.host);
 	}
 
-	const devArgs = ['run', 'dev'];
-	if (astroArgs.length > 0) {
-		devArgs.push('--', ...astroArgs);
-	}
-
-	exitCode = await run(npm, devArgs, {
+	exitCode = await run(manager.command, manager.devArgs(astroArgs), {
 		cwd: CACHE_DIR,
 		env,
+		shell: manager.shell,
 	});
 	process.exitCode = exitCode;
 }
