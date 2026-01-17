@@ -4,14 +4,24 @@
   "description": "Serve a directory of Astro, HTML, Markdown, and MDX files.",
   "type": "module",
   "bin": {
-    "astro-ssg": "./bin/astro-ssg.js"
+    "astro-ssg": "./bin/astro-ssg.ts"
   },
   "files": [
     "bin",
     "template"
   ],
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
   "engines": {
     "node": ">=22.23.4"
+  },
+  "dependencies": {
+    "cac": "^6.7.14"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.0.0"
   },
   "repository": {
     "type": "git",
