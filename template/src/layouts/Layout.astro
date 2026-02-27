@@ -1,4 +1,6 @@
 ---
+import Menu from '../menu/Menu.astro';
+
 interface Props {
 	title?: string;
 }
@@ -10,6 +12,8 @@ const theme = process.env.SSG_THEME ?? '';
 // User stylesheet, set by `astro-ssg serve --css <file>`. Loaded after the
 // theme stylesheet so it wins on equal specificity.
 const userCss = process.env.SSG_CSS_PATH ? '/astro-ssg-user.css' : '';
+// Page navigation menu, set by `astro-ssg serve --menu`.
+const menu = process.env.SSG_MENU === '1';
 ---
 
 <!doctype html>
@@ -37,6 +41,7 @@ const userCss = process.env.SSG_CSS_PATH ? '/astro-ssg-user.css' : '';
 	</head>
 	<body>
 		<slot />
+		{menu && <Menu />}
 	</body>
 </html>
 

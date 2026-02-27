@@ -1,0 +1,28 @@
+---
+import { MENU_CSS, menuLinks } from './menu.ts';
+
+const links = menuLinks();
+---
+
+<style set:html={MENU_CSS}></style>
+
+<details class="ssg-menu">
+	<summary aria-label="Toggle page menu" title="Site pages">☰</summary>
+	<div class="ssg-menu-panel">
+		<div class="ssg-menu-inner">
+			<nav class="ssg-menu-nav" aria-label="Site pages">
+				{links.length > 0 ? (
+					<ul>
+						{links.map(({ url, label }) => (
+							<li>
+								<a href={url}>{label}</a>
+							</li>
+						))}
+					</ul>
+				) : (
+					<p class="ssg-menu-empty">No navigable pages yet.</p>
+				)}
+			</nav>
+		</div>
+	</div>
+</details>
