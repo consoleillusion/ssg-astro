@@ -9,8 +9,8 @@ import { cac } from "cac"
 
 /**
  * @typedef {{ version: string }} PackageJson
- * @typedef {{ noDefaultPage: boolean }} InitOptions
- * @typedef {{ noDefaultPage: boolean, port: string | null, host: string | null }} ServeOptions
+ * @typedef {{ dir?: string, noDefaultPage: boolean }} InitOptions
+ * @typedef {{ dir?: string, noDefaultPage: boolean, port: string | null, host: string | null }} ServeOptions
  * @typedef {import("node:child_process").SpawnOptions} SpawnOptions
  * @typedef {{
  *   command: string,
@@ -72,6 +72,21 @@ const checkNodeVersion = () =>
   RUNNING_WITH_BUN || isNodeSupported()
     ? undefined
     : fail(`Node.js ${MINIMUM_NODE.join(".")} or newer is required; found ${process.versions.node}.`)
+
+/** @param {string | undefined} dir @returns {string} */
+const resolveServeDir = (dir) => {
+  const serveDir = path.resolve(dir ?? ".")
+  try {
+    return fs.statSync(serveDir).isDirectory()
+      ? serveDir
+      : fail(`${serveDir} is not a directory.`)
+  } catch (error) {
+    const err = /** @type {NodeJS.ErrnoException} */ (error)
+    return err.code === "ENOENT"
+      ? fail(`${serveDir} does not exist.`)
+      : (() => { throw error })()
+  }
+}
 
 /** @param {string} target */
 const removePath = (target) =>
@@ -140,7 +155,7 @@ const init = (options) =>
     ( checkNodeVersion()
     , initAt(serveDir, options)
     )
-  )(process.cwd())
+  )(resolveServeDir(options.dir))
 
 /** @returns {PackageManager} */
 const packageManager = () =>
@@ -206,13 +221,13 @@ const astroArgsFromOptions = (options) =>
   , options.host !== null ? ["--host", options.host] : []
   ].flat()
 
-/** @param {ServeOptions} options */
-const ensureInitialized = (options) =>
+/** @param {ServeOptions} options @param {string} serveDir */
+const ensureInitialized = (options, serveDir) =>
   !fs.existsSync(path.join(CACHE_DIR, "package.json")) || !fs.existsSync(PAGES_DIR)
-    ? (console.log("No template cache found; initializing it for this directory."), initAt(process.cwd(), options))
+    ? (console.log("No template cache found; initializing it for this directory."), initAt(serveDir, options))
     : ((linkedDir) =>
-        fs.realpathSync(process.cwd()) !== linkedDir
-          ? (console.log(`Cache is configured for ${linkedDir}; serving ${process.cwd()} instead.`), initAt(process.cwd(), options))
+        fs.realpathSync(serveDir) !== linkedDir
+          ? (console.log(`Cache is configured for ${linkedDir}; serving ${serveDir} instead.`), initAt(serveDir, options))
           : undefined
       )(fs.realpathSync(PAGES_DIR))
 
@@ -257,31 +272,32 @@ const serve = async (options) =>
   (async (serveDir) =>
     ( checkNodeVersion()
     , assertCacheIsSafe(serveDir)
-    , ensureInitialized(options)
+    , ensureInitialized(options, serveDir)
     , await runServe(packageManager(), serveEnv(options), options)
     )
-  )(process.cwd())
+  )(resolveServeDir(options.dir))
 
 const cli = cac("astro-ssg")
 
 cli
-  .command("init", "Copy the Astro template to the cache and link the current directory as its src/pages directory")
+  .command("init [dir]", "Copy the Astro template to the cache and link [dir] as its src/pages directory")
   .option("--no-default-page", "Do not provide the missing-index page at /")
   .action(
-    /** @param {{ defaultPage?: boolean }} options */
-    (options) => init({ noDefaultPage: options.defaultPage === false })
+    /** @param {string | undefined} dir @param {{ defaultPage?: boolean }} options */
+    (dir, options) => init({ dir, noDefaultPage: options.defaultPage === false })
   )
 
 cli
-  .command("serve", "Install dependencies and start the Astro dev server")
+  .command("serve [dir]", "Install dependencies and start the Astro dev server for [dir]")
   .option("--no-default-page", "Do not provide the missing-index page at /")
   .option("--port <port>", "Port for the dev server")
   .option("--host [host]", "Expose the dev server on the network")
   .action(
-    /** @param {{ defaultPage?: boolean, port?: unknown, host?: unknown }} options */
-    (options) =>
+    /** @param {string | undefined} dir @param {{ defaultPage?: boolean, port?: unknown, host?: unknown }} options */
+    (dir, options) =>
       serve
-        ( { noDefaultPage: options.defaultPage === false
+        ( { dir
+          , noDefaultPage: options.defaultPage === false
           , port: normalizePort(options.port)
           , host: normalizeHost(options.host)
           }
