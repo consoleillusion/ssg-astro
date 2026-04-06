@@ -1,8 +1,91 @@
 ---
+import fs from 'node:fs';
+import path from 'node:path';
 import Layout from '../layouts/Layout.astro';
 
 const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
 const isRoot = pathname === '/';
+
+const pageExtensions = new Set(['.astro', '.html', '.md', '.mdx']);
+const pagesDir = path.join(process.cwd(), 'src', 'pages');
+
+/**
+ * List the routes the file-based router serves, mirroring Astro's rules:
+ * ignore dotfiles, underscore-prefixed files and directories, and
+ * everything that is not a page file type.
+ *
+ * @param {string} dir
+ * @param {string[]} [segments]
+ * @returns {{ url: string, file: string }[]}
+ */
+function listPages(dir, segments = []) {
+	let entries;
+	try {
+		entries = fs.readdirSync(dir, { withFileTypes: true });
+	} catch {
+		return [];
+	}
+
+	/** @type {{ url: string, file: string }[]} */
+	const pages = [];
+
+	for (const entry of entries) {
+		const name = entry.name;
+		if (name.startsWith('.') || name.startsWith('_') || name === 'node_modules') {
+			continue;
+		}
+
+		if (entry.isDirectory()) {
+			pages.push(...listPages(path.join(dir, name), [...segments, name]));
+			continue;
+		}
+
+		if (!entry.isFile()) {
+			continue;
+		}
+
+		const extension = path.extname(name);
+		if (!pageExtensions.has(extension)) {
+			continue;
+		}
+
+		const base = path.basename(name, extension);
+
+		// Dynamic routes cannot be linked without their parameters.
+		if (base.includes('[')) {
+			continue;
+		}
+
+		// The 404 page is not a normal destination.
+		if (base === '404' && segments.length === 0) {
+			continue;
+		}
+
+		// The root index is the page this one stands in for.
+		if (base === 'index' && segments.length === 0) {
+			continue;
+		}
+
+		const isIndex = base === 'index';
+		const route = isIndex ? segments : [...segments, base];
+
+		pages.push({
+			url:
+				route.length === 0
+					? '/'
+					: `/${route.map(encodeURIComponent).join('/')}${isIndex ? '/' : ''}`,
+			file: [...segments, name].join('/'),
+		});
+	}
+
+	return pages;
+}
+
+const pages = isRoot
+	? [...new Map(listPages(pagesDir).map((page) => [page.url, page])).values()].sort((a, b) =>
+			a.url.localeCompare(b.url)
+		)
+	: [];
 ---
 <Layout title={isRoot ? 'No index page found' : 'Page not found'}>
 	<main>
@@ -41,6 +124,22 @@ const isRoot = pathname === '/';
 			<li><code>.md</code></li>
 			<li><code>.mdx</code></li>
 		</ul>
+
+		{
+			isRoot && pages.length > 0 && (
+				<section>
+					<h2>Existing pages</h2>
+					<ul class="pages">
+						{pages.map((page) => (
+							<li>
+								<a href={page.url}>{page.url}</a>
+								<span class="source">{page.file}</span>
+							</li>
+						))}
+					</ul>
+				</section>
+			)
+		}
 	</main>
 </Layout>
 
@@ -64,5 +163,19 @@ const isRoot = pathname === '/';
 
 	.files li + li {
 		margin-top: 0.25rem;
+	}
+
+	.pages {
+		padding-left: 1.25rem;
+	}
+
+	.pages li + li {
+		margin-top: 0.25rem;
+	}
+
+	.source {
+		margin-left: 0.5rem;
+		color: #666;
+		font-size: 0.875em;
 	}
 </style>

@@ -22,7 +22,8 @@ const defaultPageDisabled =
 
 /**
  * Show a helpful 404 page when the served directory has no index page.
- * It only describes the supported file types; it never lists the filesystem.
+ * It describes the supported file types and links to the pages that exist,
+ * without listing non-page files.
  *
  * @type {import('astro').AstroIntegration}
  */
