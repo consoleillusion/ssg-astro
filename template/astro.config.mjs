@@ -48,7 +48,14 @@ const missingPage = {
 	},
 };
 
+const classlessStyles = {
+	name: 'ssg-classless-styles',
+	setup({ injectScript }) {
+		injectScript('page-ssr', 'import "../../../sakura.css";');
+	},
+};
+
 // https://astro.build/config
 export default defineConfig({
-	integrations: [missingPage, mdx(), svelte()],
+	integrations: [missingPage, classlessStyles, mdx(), svelte()],
 });
