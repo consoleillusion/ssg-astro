@@ -95,6 +95,8 @@ npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --theme sak
 nix run github:consoleillusion/ssg-astro#serve -- --theme sakura-dark
 ```
 
+Run `astro-ssg themes` to list the available themes and the default.
+
 Unknown theme names are rejected.
 
 ## Custom stylesheet
