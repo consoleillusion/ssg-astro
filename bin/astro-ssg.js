@@ -153,6 +153,44 @@ const initAt = (serveDir, options) =>
   , console.log(`serving ${serveDir} as ${PAGES_DIR}`)
   , setDefaultPageMarker(options.noDefaultPage)
   , setClasslessMarker(options.classless)
+  // Create default index.html if no index page exists and default page is not disabled
+  , (() => {
+      if (!options.noDefaultPage) {
+        const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx']
+        const hasIndex = indexFiles.some(f => fs.existsSync(path.join(serveDir, f)))
+        if (!hasIndex) {
+          /** @type {string[]} */
+          const pageFiles = []
+          try {
+            /** @param {string} dir */
+            const walk = (dir) => {
+              const entries = fs.readdirSync(dir, { withFileTypes: true })
+              for (const e of entries) {
+                if (e.name.startsWith('.')) continue
+                if (e.name === 'node_modules') continue
+                if (e.isDirectory()) walk(path.join(dir, e.name))
+                else if (e.isFile()) {
+                  const ext = path.extname(e.name)
+                  if (['.astro','.html','.md','.mdx'].includes(ext)) pageFiles.push(e.name)
+                }
+              }
+            }
+            walk(serveDir)
+          } catch {}
+          if (pageFiles.length > 0) {
+            const links = pageFiles.map(f => {
+              const base = path.basename(f, path.extname(f))
+              const route = base === 'index' ? '/' : `/${base}`
+              return `<li><a href="${route}">${f}</a></li>`
+            }).join('\n')
+            const html = `<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width"/><title>ssg-ssg Default page</title>
+<style>body{font-family:system-ui,sans-serif;max-width:60rem;margin:2rem auto;padding:1rem;line-height:1.6}h1{margin-top:0}.files{padding-left:1.5rem;margin-top:1rem}a{color:#0066cc;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Default page served</h1><p>No index page was found. Default page is being served with HTTP status 200.</p><p>This server accepts these file types as pages: <code>.astro</code>, <code>.html</code>, <code>.md</code>, <code>.mdx</code></p><p>The following pages exist in this directory:</p><ul class="files">${links}</ul></body></html>`
+            fs.writeFileSync(path.join(serveDir, 'index.html'), html)
+            console.log(`Created default index.html at ${serveDir}`)
+          }
+        }
+      }
+    })()
   , console.log(indexMessage(serveDir, options.noDefaultPage))
   , undefined
   )
