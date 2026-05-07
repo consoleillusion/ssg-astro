@@ -5,28 +5,34 @@ interface Props {
 
 const { title = 'Astro Basics' } = Astro.props;
 
-// Classless stylesheet: injected when SSG_CLASSLESS env var is set via --classless flag
-const classless = process.env.SSG_CLASSLESS === '1';
+// Classless stylesheet theme, set by `astro-ssg init/serve --classless <theme>`.
+const classless = process.env.SSG_CLASSLESS ?? '';
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" class={classless ? undefined : 'ssg-reset'}>
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
-		<!-- Classless stylesheet -->
-		<link rel="stylesheet" href="/sakura.css" data-ssg-classless={classless} />
+		{classless && (
+			<link
+				rel="stylesheet"
+				href={`/${classless}.css`}
+				data-ssg-classless={classless}
+			/>
+		)}
 	</head>
 	<body>
 		<slot />
 	</body>
 </html>
+
 <style>
-	html,
-	body {
+	.ssg-reset,
+	.ssg-reset body {
 		margin: 0;
 		width: 100%;
 		height: 100%;

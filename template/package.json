@@ -13,7 +13,10 @@
     "@astrojs/svelte": "^9.1.6",
     "astro": "^7.4.12",
     "lightningcss": "^1.33.0",
+    "milligram": "^1.4.1",
+    "sakura.css": "^1.5.1",
     "sass": "^1.108.2",
+    "skeleton-css": "^2.0.4",
     "svelte": "^5.57.3",
     "typescript": "^5.9.3"
   }

@@ -48,10 +48,45 @@ const missingPage = {
 	},
 };
 
+const classlessThemes = ['sakura', 'milligram', 'skeleton'];
+const requestedClasslessTheme = (process.env.SSG_CLASSLESS ?? '').trim().toLowerCase();
+const classlessTheme = classlessThemes.includes(requestedClasslessTheme)
+	? requestedClasslessTheme
+	: '';
+
+/**
+ * Serve the selected classless stylesheet from node_modules and add it to
+ * pages that do not already get it from Layout.astro (for example Markdown
+ * pages).
+ *
+ * @type {import('astro').AstroIntegration}
+ */
 const classlessStyles = {
 	name: 'ssg-classless-styles',
-	setup({ injectScript }) {
-		injectScript('page-ssr', 'import "../../../sakura.css";');
+	hooks: {
+		'astro:config:setup': ({ injectRoute, injectScript }) => {
+			if (!classlessTheme) {
+				return;
+			}
+
+			injectRoute({
+				pattern: `/${classlessTheme}.css`,
+				entrypoint: './src/theme/css.ts',
+			});
+
+			injectScript(
+				'page',
+				`
+if (!document.querySelector('link[data-ssg-classless]')) {
+	const link = document.createElement('link');
+	link.rel = 'stylesheet';
+	link.href = ${JSON.stringify(`/${classlessTheme}.css`)};
+	link.dataset.ssgClassless = ${JSON.stringify(classlessTheme)};
+	document.head.appendChild(link);
+}
+`
+			);
+		},
 	},
 };
 
