@@ -31,9 +31,12 @@ const packageJson = /** @type {PackageJson} */ (
 const MINIMUM_NODE = [22, 23, 4]
 /** @type {readonly string[]} */
 const INDEX_FILES = ["index.astro", "index.html", "index.md", "index.mdx"]
+/** Page extensions in priority order; the first match wins for a route. */
+const PAGE_EXTENSIONS = [".astro", ".html", ".md", ".mdx"]
 /** @type {readonly ClasslessTheme[]} */
 const CLASSLESS_THEMES = ["sakura", "milligram", "skeleton"]
 const DEFAULT_CLASSLESS_THEME = "sakura"
+const GENERATED_INDEX_MARKER = "<!-- astro-ssg:generated-index -->"
 const TEMPLATE_VERSION = "2"
 const RUNNING_WITH_BUN = Boolean(process.versions.bun)
 
@@ -122,9 +125,21 @@ const assertCacheIsSafe = (serveDir) =>
       : undefined
   )(path.resolve(CACHE_DIR), path.resolve(serveDir))
 
+/** @param {string} filePath @returns {boolean} */
+const isGeneratedIndex = (filePath) => {
+  try {
+    return fs.readFileSync(filePath, "utf8").includes(GENERATED_INDEX_MARKER)
+  } catch {
+    return false
+  }
+}
+
 /** @param {string} serveDir @returns {boolean} */
-const hasIndexPage = (serveDir) =>
-  INDEX_FILES.some((file) => fs.existsSync(path.join(serveDir, file)))
+const hasUserIndexPage = (serveDir) =>
+  INDEX_FILES.some((file) => {
+    const filePath = path.join(serveDir, file)
+    return fs.existsSync(filePath) && (file !== "index.html" || !isGeneratedIndex(filePath))
+  })
 
 /** @param {string} value @returns {value is ClasslessTheme} */
 const isClasslessTheme = (value) =>
@@ -145,17 +160,20 @@ const normalizeClassless = (value) => {
 
 /** @param {string} serveDir @param {boolean} noDefaultPage @returns {string} */
 const indexMessage = (serveDir, noDefaultPage) =>
-  hasIndexPage(serveDir)
+  hasUserIndexPage(serveDir)
     ? "Found an index page; / will serve it."
     : noDefaultPage
       ? "No index page found; / will return 404 (default page disabled)."
-      : "No index page found; / will show a page describing the supported file types."
+      : "No index page found; / will show the generated default page."
 
 /** @param {boolean} noDefaultPage */
 const setDefaultPageMarker = (noDefaultPage) =>
   noDefaultPage
     ? fs.writeFileSync(MARKER_PATH, "")
     : fs.rmSync(MARKER_PATH, { force: true })
+
+/** @returns {boolean} */
+const readDefaultPageMarker = () => fs.existsSync(MARKER_PATH)
 
 /** @param {ClasslessTheme | null} theme */
 const setClasslessMarker = (theme) =>
@@ -172,6 +190,138 @@ const readClasslessMarker = () => {
   } catch {
     return null
   }
+}
+
+/**
+ * List the page routes Astro serves, with lowercase, extensionless paths.
+ * When several files map to the same route, PAGE_EXTENSIONS decides the winner.
+ *
+ * @param {string} serveDir
+ * @returns {{ path: string, href: string, file: string }[]}
+ */
+const listPageRoutes = (serveDir) => {
+  /** @type {Map<string, { path: string, file: string, priority: number }>} */
+  const routes = new Map()
+
+  /** @param {string} dir @param {string[]} [segments] */
+  const walk = (dir, segments = []) => {
+    /** @type {import("node:fs").Dirent[]} */
+    let entries
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+
+    for (const entry of entries) {
+      const name = entry.name
+      if (name.startsWith(".") || name.startsWith("_") || name === "node_modules") continue
+
+      if (entry.isDirectory()) {
+        walk(path.join(dir, name), [...segments, name])
+        continue
+      }
+      if (!entry.isFile()) continue
+
+      const extension = path.extname(name)
+      const priority = PAGE_EXTENSIONS.indexOf(extension)
+      if (priority === -1) continue
+
+      const base = path.basename(name, extension)
+      if (base.includes("[")) continue
+      if (base === "404" && segments.length === 0) continue
+      if (base === "index" && segments.length === 0) continue
+
+      const isIndex = base === "index"
+      const routeSegments = isIndex ? segments : [...segments, base]
+      const route =
+        routeSegments.length === 0
+          ? "/"
+          : `/${routeSegments.join("/")}${isIndex ? "/" : ""}`
+      const key = route.toLowerCase()
+      const existing = routes.get(key)
+      if (!existing || priority < existing.priority) {
+        routes.set(key, {
+          path: key,
+          file: [...segments, name].join("/"),
+          priority,
+        })
+      }
+    }
+  }
+
+  walk(serveDir)
+
+  return [...routes.values()]
+    .sort((a, b) => a.path.localeCompare(b.path))
+    .map(({ path: pagePath, file }) => {
+      const href =
+        pagePath === "/"
+          ? "/"
+          : `/${pagePath
+              .split("/")
+              .filter(Boolean)
+              .map(encodeURIComponent)
+              .join("/")}${pagePath.endsWith("/") ? "/" : ""}`
+      return { path: pagePath, href, file }
+    })
+}
+
+/** @param {string} serveDir @param {InitOptions} options */
+const writeDefaultIndex = (serveDir, options) => {
+  const generatedPath = path.join(serveDir, "index.html")
+  const generated = fs.existsSync(generatedPath) && isGeneratedIndex(generatedPath)
+  const userIndex = INDEX_FILES.some((file) => {
+    if (file === "index.html") return fs.existsSync(generatedPath) && !generated
+    return fs.existsSync(path.join(serveDir, file))
+  })
+
+  if (userIndex) {
+    // A real index page exists, so remove our stale generated one.
+    if (generated) fs.rmSync(generatedPath, { force: true })
+    return
+  }
+
+  if (options.noDefaultPage) {
+    if (generated) fs.rmSync(generatedPath, { force: true })
+    return
+  }
+
+  const pages = listPageRoutes(serveDir)
+  const links = pages
+    .map(({ path: pagePath, href }) => `<li><a href="${href}">${pagePath}</a></li>`)
+    .join("\n")
+  const pageList =
+    pages.length > 0
+      ? `<p>The following pages exist in this directory:</p><ul class="files">${links}</ul>`
+      : "<p>No page files were found in this directory yet.</p>"
+  const themeLink = options.classless
+    ? `<link rel="stylesheet" href="/${options.classless}.css" data-ssg-classless="${options.classless}" />`
+    : ""
+
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+${GENERATED_INDEX_MARKER}
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width" />
+<title>astro-ssg default page</title>
+<style>body{font-family:system-ui,sans-serif;max-width:60rem;margin:2rem auto;padding:1rem;line-height:1.6}h1{margin-top:0}.files{padding-left:1.5rem;margin-top:1rem}</style>
+${themeLink}
+</head>
+<body>
+<h1>Default page served</h1>
+<p>No index page was found. This default page is served with HTTP status 200.</p>
+<p>This server accepts these file types as pages: <code>.astro</code>, <code>.html</code>, <code>.md</code>, <code>.mdx</code></p>
+${pageList}
+</body>
+</html>
+`
+
+  if (generated && fs.readFileSync(generatedPath, "utf8") === html) return
+
+  fs.writeFileSync(generatedPath, html)
+  console.log(`Created default index.html at ${serveDir}`)
 }
 
 /** @returns {boolean} */
@@ -201,44 +351,7 @@ const initAt = (serveDir, options) =>
   , console.log(`serving ${serveDir} as ${PAGES_DIR}`)
   , setDefaultPageMarker(options.noDefaultPage)
   , setClasslessMarker(options.classless)
-  // Create default index.html if no index page exists and default page is not disabled
-  , (() => {
-      if (!options.noDefaultPage) {
-        const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx']
-        const hasIndex = indexFiles.some(f => fs.existsSync(path.join(serveDir, f)))
-        if (!hasIndex) {
-          /** @type {string[]} */
-          const pageFiles = []
-          try {
-            /** @param {string} dir */
-            const walk = (dir) => {
-              const entries = fs.readdirSync(dir, { withFileTypes: true })
-              for (const e of entries) {
-                if (e.name.startsWith('.')) continue
-                if (e.name === 'node_modules') continue
-                if (e.isDirectory()) walk(path.join(dir, e.name))
-                else if (e.isFile()) {
-                  const ext = path.extname(e.name)
-                  if (['.astro','.html','.md','.mdx'].includes(ext)) pageFiles.push(e.name)
-                }
-              }
-            }
-            walk(serveDir)
-          } catch {}
-          if (pageFiles.length > 0) {
-            const links = pageFiles.map(f => {
-              const base = path.basename(f, path.extname(f))
-              const route = base === 'index' ? '/' : `/${base}`
-              return `<li><a href="${route}">${f}</a></li>`
-            }).join('\n')
-            const html = `<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width"/><title>ssg-ssg Default page</title>
-<style>body{font-family:system-ui,sans-serif;max-width:60rem;margin:2rem auto;padding:1rem;line-height:1.6}h1{margin-top:0}.files{padding-left:1.5rem;margin-top:1rem}a{color:#0066cc;text-decoration:none}a:hover{text-decoration:underline}</style></head><body><h1>Default page served</h1><p>No index page was found. Default page is being served with HTTP status 200.</p><p>This server accepts these file types as pages: <code>.astro</code>, <code>.html</code>, <code>.md</code>, <code>.mdx</code></p><p>The following pages exist in this directory:</p><ul class="files">${links}</ul></body></html>`
-            fs.writeFileSync(path.join(serveDir, 'index.html'), html)
-            console.log(`Created default index.html at ${serveDir}`)
-          }
-        }
-      }
-    })()
+  , writeDefaultIndex(serveDir, options)
   , console.log(indexMessage(serveDir, options.noDefaultPage))
   , undefined
   )
@@ -371,6 +484,7 @@ const serve = async (options) =>
     ( checkNodeVersion()
     , assertCacheIsSafe(serveDir)
     , ensureInitialized(options, serveDir)
+    , writeDefaultIndex(serveDir, options)
     , await runServe(packageManager(), serveEnv(options), options)
     )
   )(resolveServeDir(options.dir))
@@ -403,7 +517,7 @@ cli
     (dir, options) =>
       serve
         ( { dir
-          , noDefaultPage: options.defaultPage === false
+          , noDefaultPage: options.defaultPage === false || readDefaultPageMarker()
           , classless: normalizeClassless(options.classless) ?? readClasslessMarker()
           , port: normalizePort(options.port)
           , host: normalizeHost(options.host)

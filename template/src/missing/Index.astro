@@ -6,7 +6,7 @@ import Layout from '../layouts/Layout.astro';
 const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
 const isRoot = pathname === '/';
 
-const pageExtensions = new Set(['.astro', '.html', '.md', '.mdx']);
+const pageExtensions = ['.astro', '.html', '.md', '.mdx'];
 const pagesDir = path.join(process.cwd(), 'src', 'pages');
 
 /**
@@ -14,9 +14,12 @@ const pagesDir = path.join(process.cwd(), 'src', 'pages');
  * ignore dotfiles, underscore-prefixed files and directories, and
  * everything that is not a page file type.
  *
+ * Paths are extensionless and lowercase. When several files share a route,
+ * pageExtensions decides which one is linked.
+ *
  * @param {string} dir
  * @param {string[]} [segments]
- * @returns {{ url: string, file: string }[]}
+ * @returns {{ url: string, file: string, priority: number }[]}
  */
 function listPages(dir, segments = []) {
 	let entries;
@@ -26,7 +29,7 @@ function listPages(dir, segments = []) {
 		return [];
 	}
 
-	/** @type {{ url: string, file: string }[]} */
+	/** @type {{ url: string, file: string, priority: number }[]} */
 	const pages = [];
 
 	for (const entry of entries) {
@@ -45,7 +48,8 @@ function listPages(dir, segments = []) {
 		}
 
 		const extension = path.extname(name);
-		if (!pageExtensions.has(extension)) {
+		const priority = pageExtensions.indexOf(extension);
+		if (priority === -1) {
 			continue;
 		}
 
@@ -73,8 +77,11 @@ function listPages(dir, segments = []) {
 			url:
 				route.length === 0
 					? '/'
-					: `/${route.map(encodeURIComponent).join('/')}${isIndex ? '/' : ''}`,
+					: `/${route
+							.map((segment) => encodeURIComponent(segment.toLowerCase()))
+							.join('/')}${isIndex ? '/' : ''}`,
 			file: [...segments, name].join('/'),
+			priority,
 		});
 	}
 
@@ -82,9 +89,17 @@ function listPages(dir, segments = []) {
 }
 
 const pages = isRoot
-	? [...new Map(listPages(pagesDir).map((page) => [page.url, page])).values()].sort((a, b) =>
-			a.url.localeCompare(b.url)
-		)
+	? [
+			...listPages(pagesDir)
+				.reduce((best, page) => {
+					const existing = best.get(page.url);
+					if (!existing || page.priority < existing.priority) {
+						best.set(page.url, page);
+					}
+					return best;
+				}, new Map())
+				.values(),
+		].sort((a, b) => a.url.localeCompare(b.url))
 	: [];
 ---
 <Layout title={isRoot ? 'No index page found' : 'Page not found'}>
