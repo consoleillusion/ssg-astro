@@ -346,6 +346,12 @@ export default defineConfig({
 		// noise there — hide it.
 		enabled: false,
 	},
+	logger: {
+		// The pages directory is a symlink to the directory being served; this
+		// drops the per-file "Unsupported file type" warnings for framework
+		// components, which cannot be pages here anyway.
+		entrypoint: './src/logger.js',
+	},
 	integrations: [missingPage, themeStyles, userStyles, menu, mdx(), svelte()],
 	markdown: {
 		processor: satteri({ mdastPlugins: menuEnabled ? [menuMdastPlugin()] : [] }),
