@@ -11,6 +11,7 @@ import { satteri } from '@astrojs/markdown-satteri';
 
 import { listPages } from './src/routes.js';
 import { menuMdastPlugin } from './src/menu/satteri.ts';
+import { resolveEditable, applyEdit } from './src/edit/edit.ts';
 
 const notFoundFiles = ['404.astro', '404.html', '404.md', '404.mdx'];
 const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx'];
@@ -77,6 +78,7 @@ const theme = themeNames.includes(requestedTheme)
 const userCssPath = (process.env.SSG_CSS_PATH ?? '').trim();
 const userCssRoute = '/astro-ssg-user.css';
 const menuEnabled = process.env.SSG_MENU === '1';
+const editEnabled = process.env.SSG_EDIT === '1';
 
 /**
  * Serve the selected theme stylesheet from node_modules and add it to
@@ -147,6 +149,145 @@ if (!document.querySelector('link[data-ssg-css]')) {
 }
 `
 			);
+		},
+	},
+};
+
+/**
+ * WYSIWYG editing. When `astro-ssg serve --edit` is set, pages backed by an
+ * existing .html/.md/.mdx file get their main content made contenteditable in
+ * the browser, with an explicit Save button that POSTs the edited HTML back
+ * here. Astro pages and routes without a source file (the built-in default
+ * page and 404) are read-only.
+ *
+ * @type {import('vite').Plugin}
+ */
+const edit = {
+	name: 'ssg-edit',
+	configureServer(server) {
+		if (!editEnabled) {
+			return;
+		}
+
+		const readBody = (req) =>
+			new Promise((resolve, reject) => {
+				let data = '';
+				req.on('data', (chunk) => {
+					data += chunk;
+					if (data.length > 10 * 1024 * 1024) {
+						reject(new Error('Request body too large'));
+						req.destroy();
+					}
+				});
+				req.on('end', () => resolve(data));
+				req.on('error', reject);
+			});
+
+		const json = (res, status, body) => {
+			res.statusCode = status;
+			res.setHeader('content-type', 'application/json; charset=utf-8');
+			res.end(JSON.stringify(body));
+		};
+
+		server.middlewares.use((req, res, next) => {
+			const [rawPath] = (req.url ?? '').split('?');
+			const query = (req.url ?? '').split('?')[1] ?? '';
+			const url = decodeURIComponent(new URLSearchParams(query).get('path') ?? rawPath);
+
+			if (rawPath === '/astro-ssg-edit/status' && req.method === 'GET') {
+				const editable = resolveEditable(pagesDir, url);
+				json(res, 200, { editable: Boolean(editable), type: editable?.type ?? null });
+				return;
+			}
+
+			if (rawPath === '/astro-ssg-edit/save' && req.method === 'POST') {
+				readBody(req)
+					.then((raw) => {
+						/** @type {{ path?: string, html?: string }} */
+						const payload = JSON.parse(raw);
+						const target = resolveEditable(pagesDir, typeof payload.path === 'string' ? payload.path : '');
+						if (!target) {
+							return json(res, 400, { ok: false, error: 'This route is not editable.' });
+						}
+						if (typeof payload.html !== 'string') {
+							return json(res, 400, { ok: false, error: 'Missing edited HTML.' });
+						}
+						try {
+							applyEdit(target.file, target.type, payload.html);
+							json(res, 200, { ok: true });
+						} catch (error) {
+							json(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
+						}
+					})
+					.catch((error) => json(res, 400, { ok: false, error: error instanceof Error ? error.message : String(error) }));
+				return;
+			}
+
+			next();
+		});
+	},
+};
+
+const editBootstrap = `
+(async () => {
+	const target = document.querySelector('main') ?? document.body;
+	const response = await fetch('/astro-ssg-edit/status?path=' + encodeURIComponent(window.location.pathname));
+	if (!response.ok) return;
+	const status = await response.json();
+	if (!status.editable) return;
+	target.contentEditable = 'true';
+	target.dataset.ssgEditTarget = 'true';
+	target.style.outline = '2px dashed transparent';
+	target.addEventListener('focus', () => { target.style.outlineColor = '#4f8ef7'; });
+	target.addEventListener('blur', () => { target.style.outlineColor = 'transparent'; });
+	const button = document.createElement('button');
+	button.textContent = 'Save';
+	button.dataset.ssgEditUi = 'true';
+	button.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:9999;padding:0.5rem 1rem;font:600 0.9rem system-ui;color:#fff;background:#4f8ef7;border:0;border-radius:0.5rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+	const note = document.createElement('span');
+	note.dataset.ssgEditUi = 'true';
+	note.style.cssText = 'position:fixed;bottom:1.25rem;right:5rem;z-index:9999;font:0.85rem system-ui;color:#555';
+	document.body.append(button, note);
+	button.addEventListener('click', async () => {
+		const clone = target.cloneNode(true);
+		for (const el of clone.querySelectorAll('[data-ssg-edit-ui], details.ssg-menu')) el.remove();
+		button.disabled = true;
+		note.textContent = 'Saving…';
+		try {
+			const save = await fetch('/astro-ssg-edit/save', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ path: window.location.pathname, html: clone.innerHTML }),
+			});
+			const result = await save.json();
+			if (result.ok) {
+				note.textContent = 'Saved.';
+				window.location.reload();
+			} else {
+				note.textContent = 'Save failed: ' + (result.error ?? 'unknown error');
+				button.disabled = false;
+			}
+		} catch {
+			note.textContent = 'Save failed.';
+			button.disabled = false;
+		}
+	});
+})();
+`;
+
+/**
+ * Inject the edit bootstrap only when --edit is passed.
+ *
+ * @type {import('astro').AstroIntegration}
+ */
+const editIntegration = {
+	name: 'ssg-edit',
+	hooks: {
+		'astro:config:setup': ({ injectScript }) => {
+			if (!editEnabled) {
+				return;
+			}
+			injectScript('page', editBootstrap);
 		},
 	},
 };
@@ -352,11 +493,11 @@ export default defineConfig({
 		// components, which cannot be pages here anyway.
 		entrypoint: './src/logger.js',
 	},
-	integrations: [missingPage, themeStyles, userStyles, menu, mdx(), svelte()],
+	integrations: [missingPage, themeStyles, userStyles, menu, editIntegration, mdx(), svelte()],
 	markdown: {
 		processor: satteri({ mdastPlugins: menuEnabled ? [menuMdastPlugin()] : [] }),
 	},
 	vite: {
-		plugins: [utf8Html, lowercaseRoutes, userCssReload],
+		plugins: [utf8Html, lowercaseRoutes, userCssReload, edit],
 	},
 });
