@@ -8,8 +8,9 @@ import mdx from '@astrojs/mdx';
 
 import svelte from '@astrojs/svelte';
 
+import { listPages } from './src/routes.js';
+
 const notFoundFiles = ['404.astro', '404.html', '404.md', '404.mdx'];
-const pageExtensions = ['.astro', '.html', '.md', '.mdx'];
 
 const root = process.cwd();
 const pagesDir = path.join(root, 'src', 'pages');
@@ -88,72 +89,24 @@ if (!document.querySelector('link[data-ssg-classless]')) {
 	},
 };
 
-/**
- * @param {string} dir
- * @param {string[]} [segments]
- * @param {Map<string, { actual: string, priority: number }>} [routes]
- * @returns {Map<string, { actual: string, priority: number }>}
- */
-function collectRoutes(dir, segments = [], routes = new Map()) {
-	let entries;
-	try {
-		entries = fs.readdirSync(dir, { withFileTypes: true });
-	} catch {
-		return routes;
-	}
-
-	for (const entry of entries) {
-		const name = entry.name;
-		if (name.startsWith('.') || name.startsWith('_') || name === 'node_modules') {
-			continue;
-		}
-
-		if (entry.isDirectory()) {
-			collectRoutes(path.join(dir, name), [...segments, name], routes);
-			continue;
-		}
-
-		if (!entry.isFile()) {
-			continue;
-		}
-
-		const extension = path.extname(name);
-		const priority = pageExtensions.indexOf(extension);
-		if (priority === -1) {
-			continue;
-		}
-
-		const base = path.basename(name, extension);
-		if (base.includes('[')) {
-			continue;
-		}
-		if (base === '404' && segments.length === 0) {
-			continue;
-		}
-		if (base === 'index' && segments.length === 0) {
-			continue;
-		}
-
-		const isIndex = base === 'index';
-		const parts = isIndex ? segments : [...segments, base];
-		const actual = parts.length === 0 ? '/' : `/${parts.join('/')}${isIndex ? '/' : ''}`;
-		const key = actual.replace(/\/+$/, '').toLowerCase() || '/';
-		const existing = routes.get(key);
-
-		if (!existing || priority < existing.priority) {
-			routes.set(key, { actual, priority });
-		}
-	}
-
-	return routes;
-}
-
 let routeCache;
 
 /** @returns {Map<string, { actual: string, priority: number }>} */
 function routesFor() {
-	routeCache ??= collectRoutes(pagesDir);
-	return routeCache;
+	if (routeCache) {
+		return routeCache;
+	}
+
+	/** @type {Map<string, { actual: string, priority: number }>} */
+	const routes = new Map();
+	for (const page of listPages(pagesDir)) {
+		const existing = routes.get(page.lookup);
+		if (!existing || page.priority < existing.priority) {
+			routes.set(page.lookup, { actual: page.actual, priority: page.priority });
+		}
+	}
+
+	return (routeCache = routes);
 }
 
 /**
