@@ -13,7 +13,6 @@ import { listPages } from "../template/src/routes.js"
 /**
  * @typedef {{ version: string }} PackageJson
  * @typedef {"sakura" | "milligram" | "skeleton"} ClasslessTheme
- * @typedef {{ dir?: string, noDefaultPage: boolean, classless: ClasslessTheme | null }} InitOptions
  * @typedef {{ dir?: string, noDefaultPage: boolean, classless: ClasslessTheme | null, port: string | null, host: string | null }} ServeOptions
  * @typedef {import("node:child_process").SpawnOptions} SpawnOptions
  * @typedef {{
@@ -37,7 +36,7 @@ const INDEX_FILES = ["index.astro", "index.html", "index.md", "index.mdx"]
 const CLASSLESS_THEMES = ["sakura", "milligram", "skeleton"]
 const DEFAULT_CLASSLESS_THEME = "sakura"
 const GENERATED_INDEX_MARKER = "<!-- astro-ssg:generated-index -->"
-const TEMPLATE_VERSION = "3"
+const TEMPLATE_VERSION = "4"
 const RUNNING_WITH_BUN = Boolean(process.versions.bun)
 
 /** @param {string} message @returns {never} */
@@ -59,8 +58,6 @@ const defaultCacheDir = () =>
 
 const CACHE_DIR = defaultCacheDir()
 const PAGES_DIR = path.join(CACHE_DIR, "src", "pages")
-const MARKER_PATH = path.join(CACHE_DIR, ".no-default-page")
-const CLASSLESS_MARKER_PATH = path.join(CACHE_DIR, ".classless")
 const TEMPLATE_VERSION_PATH = path.join(CACHE_DIR, ".template-version")
 
 const checkNodeVersion = () =>
@@ -151,33 +148,7 @@ const indexMessage = (serveDir, noDefaultPage) =>
       ? "No index page found; / will return 404 (default page disabled)."
       : "No index page found; / will show the generated default page."
 
-/** @param {boolean} noDefaultPage */
-const setDefaultPageMarker = (noDefaultPage) =>
-  noDefaultPage
-    ? fs.writeFileSync(MARKER_PATH, "")
-    : fs.rmSync(MARKER_PATH, { force: true })
-
-/** @returns {boolean} */
-const readDefaultPageMarker = () => fs.existsSync(MARKER_PATH)
-
-/** @param {ClasslessTheme | null} theme */
-const setClasslessMarker = (theme) =>
-  theme
-    ? fs.writeFileSync(CLASSLESS_MARKER_PATH, theme)
-    : fs.rmSync(CLASSLESS_MARKER_PATH, { force: true })
-
-/** @returns {ClasslessTheme | null} */
-const readClasslessMarker = () => {
-  try {
-    const value = fs.readFileSync(CLASSLESS_MARKER_PATH, "utf8").trim().toLowerCase()
-    if (value === "") return DEFAULT_CLASSLESS_THEME
-    return isClasslessTheme(value) ? value : null
-  } catch {
-    return null
-  }
-}
-
-/** @param {string} serveDir @param {InitOptions} options */
+/** @param {string} serveDir @param {ServeOptions} options */
 const writeDefaultIndex = (serveDir, options) => {
   const generatedPath = path.join(serveDir, "index.html")
   const generated = fs.existsSync(generatedPath) && isGeneratedIndex(generatedPath)
@@ -247,32 +218,24 @@ const cacheIsCurrent = () => {
   }
 }
 
-/** @param {string} serveDir @param {InitOptions} options */
-const initAt = (serveDir, options) =>
+/** @param {string} serveDir @param {ServeOptions} options */
+const initializeCache = (serveDir, options) =>
   ( assertCacheIsSafe(serveDir)
   , console.log(`copying template to ${CACHE_DIR}`)
   , fs.rmSync(CACHE_DIR, { recursive: true, force: true })
   , fs.mkdirSync(CACHE_DIR, { recursive: true })
   , fs.cpSync(templateDir, CACHE_DIR, { recursive: true })
   , fs.writeFileSync(TEMPLATE_VERSION_PATH, TEMPLATE_VERSION)
+  , fs.rmSync(path.join(CACHE_DIR, ".classless"), { force: true })
+  , fs.rmSync(path.join(CACHE_DIR, ".no-default-page"), { force: true })
   , fs.mkdirSync(path.dirname(PAGES_DIR), { recursive: true })
   , removePath(PAGES_DIR)
   , fs.symlinkSync(serveDir, PAGES_DIR, process.platform === "win32" ? "junction" : "dir")
   , console.log(`serving ${serveDir} as ${PAGES_DIR}`)
-  , setDefaultPageMarker(options.noDefaultPage)
-  , setClasslessMarker(options.classless)
   , writeDefaultIndex(serveDir, options)
   , console.log(indexMessage(serveDir, options.noDefaultPage))
   , undefined
   )
-
-/** @param {InitOptions} options */
-const init = (options) =>
-  ((serveDir) =>
-    ( checkNodeVersion()
-    , initAt(serveDir, options)
-    )
-  )(resolveServeDir(options.dir))
 
 /** @returns {PackageManager} */
 const packageManager = () =>
@@ -341,10 +304,10 @@ const astroArgsFromOptions = (options) =>
 /** @param {ServeOptions} options @param {string} serveDir */
 const ensureInitialized = (options, serveDir) =>
   !cacheIsCurrent()
-    ? (console.log("No current template cache found; initializing it for this directory."), initAt(serveDir, options))
+    ? (console.log("No current template cache found; initializing it for this directory."), initializeCache(serveDir, options))
     : ((linkedDir) =>
         fs.realpathSync(serveDir) !== linkedDir
-          ? (console.log(`Cache is configured for ${linkedDir}; serving ${serveDir} instead.`), initAt(serveDir, options))
+          ? (console.log(`Cache is configured for ${linkedDir}; serving ${serveDir} instead.`), initializeCache(serveDir, options))
           : undefined
       )(fs.realpathSync(PAGES_DIR))
 
@@ -402,22 +365,7 @@ const serve = async (options) =>
 const cli = cac("astro-ssg")
 
 cli
-  .command("init [dir]", "Copy the Astro template to the cache and link [dir] as its src/pages directory")
-  .option("--no-default-page", "Do not provide the missing-index page at /")
-  .option("--classless [theme]", `Style every route with a classless stylesheet (${CLASSLESS_THEMES.join(", ")})`)
-  .action(
-    /** @param {string | undefined} dir @param {{ defaultPage?: boolean, classless?: boolean | string }} options */
-    (dir, options) =>
-      init
-        ( { dir
-          , noDefaultPage: options.defaultPage === false
-          , classless: normalizeClassless(options.classless)
-          }
-        )
-  )
-
-cli
-  .command("serve [dir]", "Install dependencies and start the Astro dev server for [dir]")
+  .command("serve [dir]", "Copy the template to the cache if needed, then install dependencies and start the dev server")
   .option("--no-default-page", "Do not provide the missing-index page at /")
   .option("--classless [theme]", `Style every route with a classless stylesheet (${CLASSLESS_THEMES.join(", ")})`)
   .option("--port <port>", "Port for the dev server")
@@ -427,8 +375,8 @@ cli
     (dir, options) =>
       serve
         ( { dir
-          , noDefaultPage: options.defaultPage === false || readDefaultPageMarker()
-          , classless: normalizeClassless(options.classless) ?? readClasslessMarker()
+          , noDefaultPage: options.defaultPage === false
+          , classless: normalizeClassless(options.classless)
           , port: normalizePort(options.port)
           , host: normalizeHost(options.host)
           }
@@ -447,6 +395,8 @@ cli.version(packageJson.version)
 
 const parsed = cli.parse()
 
-;(parsed.args.length === 0 && !cli.matchedCommand)
-  ? cli.outputHelp()
-  : undefined
+if (!cli.matchedCommand) {
+  parsed.args.length === 0
+    ? cli.outputHelp()
+    : fail(`Unknown command "${parsed.args[0]}". This CLI has one command: serve. See astro-ssg --help.`)
+}
