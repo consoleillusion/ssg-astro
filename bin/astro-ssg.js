@@ -97,6 +97,25 @@ const removePath = (target) =>
     })()
   )
 
+/**
+ * Make the cache writable. The template may come from a read-only source
+ * (for example the Nix store), and the cache must stay writable so npm can
+ * update package-lock.json and install node_modules.
+ *
+ * @param {string} dir
+ */
+const makeWritable = (dir) => {
+  try {
+    fs.chmodSync(dir, 0o755)
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const target = path.join(dir, entry.name)
+      entry.isDirectory() ? makeWritable(target) : fs.chmodSync(target, 0o644)
+    }
+  } catch {
+    // Best effort; surfaces later if npm actually fails.
+  }
+}
+
 /** @param {string} serveDir */
 const assertCacheIsSafe = (serveDir) =>
   ((cache, served) =>
@@ -225,6 +244,7 @@ const initializeCache = (serveDir, options) =>
   , fs.rmSync(CACHE_DIR, { recursive: true, force: true })
   , fs.mkdirSync(CACHE_DIR, { recursive: true })
   , fs.cpSync(templateDir, CACHE_DIR, { recursive: true })
+  , makeWritable(CACHE_DIR)
   , fs.writeFileSync(TEMPLATE_VERSION_PATH, TEMPLATE_VERSION)
   , fs.rmSync(path.join(CACHE_DIR, ".classless"), { force: true })
   , fs.rmSync(path.join(CACHE_DIR, ".no-default-page"), { force: true })
