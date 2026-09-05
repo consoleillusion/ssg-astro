@@ -60,6 +60,92 @@ const CACHE_DIR = defaultCacheDir()
 const PAGES_DIR = path.join(CACHE_DIR, "src", "pages")
 const TEMPLATE_VERSION_PATH = path.join(CACHE_DIR, ".template-version")
 
+// The lockfiles pin prebuilt native packages for both glibc and musl. The
+// variant for the other libc cannot be dlopen'd, so it is dead weight
+// (~50 MB).
+/** @type {Record<"glibc" | "musl", readonly string[]>} */
+const LIBC_PACKAGES = {
+  // Delete on glibc (musl variants)
+  glibc: [
+    "lightningcss-linux-x64-musl",
+    "lightningcss-linux-arm64-musl",
+    "@img/sharp-linuxmusl-x64",
+    "@img/sharp-libvips-linuxmusl-x64",
+    "@img/sharp-linuxmusl-arm64",
+    "@img/sharp-libvips-linuxmusl-arm64",
+    "@rolldown/binding-linux-x64-musl",
+    "@rolldown/binding-linux-arm64-musl",
+  ],
+  // Delete on musl (glibc variants)
+  musl: [
+    "lightningcss-linux-x64-gnu",
+    "lightningcss-linux-arm64-gnu",
+    "@img/sharp-linux-x64",
+    "@img/sharp-libvips-linux-x64",
+    "@img/sharp-linux-arm64",
+    "@img/sharp-libvips-linux-arm64",
+    "@rolldown/binding-linux-x64-gnu",
+    "@rolldown/binding-linux-arm64-gnu",
+  ],
+}
+
+/** @returns {"glibc" | "musl" | null} */
+const detectLibc = () => {
+  if (process.platform !== "linux") return null
+  try {
+    const report = /** @type {{ header?: { glibcVersionRuntime?: string } } | undefined} */ (
+      process.report?.getReport?.()
+    )
+    if (report?.header?.glibcVersionRuntime) return "glibc"
+  } catch {
+    // Fall through to the ldd heuristic.
+  }
+  try {
+    return /musl/i.test(fs.readFileSync("/usr/bin/ldd", "utf8")) ? "musl" : null
+  } catch {
+    return null
+  }
+}
+
+/** @param {string} target @returns {number} */
+const dirSize = (target) => {
+  try {
+    const stat = fs.statSync(target)
+    if (!stat.isDirectory()) return stat.size
+    return fs
+      .readdirSync(target)
+      .reduce((sum, name) => sum + dirSize(path.join(target, name)), 0)
+  } catch {
+    return 0
+  }
+}
+
+/**
+ * Remove prebuilt packages for the foreign libc from the cache's
+ * node_modules. Called after every install; deleting directories that
+ * already vanished is a no-op.
+ * @param {string} nodeModulesDir
+ */
+const pruneForeignLibcPackages = (nodeModulesDir) => {
+  const libc = detectLibc()
+  if (!libc) return undefined
+  const removed = LIBC_PACKAGES[libc].reduce(
+    (acc, name) => {
+      const target = path.join(nodeModulesDir, name)
+      if (!fs.existsSync(target)) return acc
+      const bytes = dirSize(target)
+      removePath(target)
+      return { count: acc.count + 1, bytes: acc.bytes + bytes }
+    },
+    { count: 0, bytes: 0 }
+  )
+  return removed.count > 0
+    ? console.log(
+        `removed ${removed.count} prebuilt packages for the foreign libc (${Math.round(removed.bytes / 1024 / 1024)} MB)`
+      )
+    : undefined
+}
+
 const checkNodeVersion = () =>
   RUNNING_WITH_BUN || compareVersions(process.versions.node, MINIMUM_NODE) >= 0
     ? undefined
@@ -359,16 +445,19 @@ const runServe = (manager, env, options) =>
     ).then((installCode) =>
       installCode !== 0
         ? (process.exitCode = installCode, undefined)
-        : run
-          ( manager.command
-          , manager.devArgs(astroArgsFromOptions(options))
-          , { cwd: CACHE_DIR
-            , env
-            , shell: manager.shell
-            }
-          ).then((exitCode) => {
-            process.exitCode = exitCode
-          })
+        : (() => {
+            pruneForeignLibcPackages(path.join(CACHE_DIR, "node_modules"))
+            return run
+              ( manager.command
+              , manager.devArgs(astroArgsFromOptions(options))
+              , { cwd: CACHE_DIR
+                , env
+                , shell: manager.shell
+                }
+              ).then((exitCode) => {
+                process.exitCode = exitCode
+              })
+          })()
     ))
 
 /** @param {ServeOptions} options @returns {Promise<void>} */
