@@ -145,9 +145,11 @@ npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --edit
 nix run github:consoleillusion/ssg-astro#serve -- --edit
 ```
 
-In the browser, every page backed by an existing `.html`, `.md`, or `.mdx` file gets a dashed-outline editable main content area and a floating Save button in the bottom-right corner. Click Save to write the changes back to the source file on disk. Markdown pages are converted back to Markdown on save (front matter is preserved); HTML pages have their `<main>` element replaced in place.
+With `--edit`, pages backed by `.md` or `.mdx` files become a live Markdown WYSIWYG editor in the browser (powered by Milkdown Crepe): typing `#`, `*`, backticks, etc. formats inline as you type, and the toolbar covers headings, lists, code blocks, tables, and more. The existing page content is replaced by the editor until you reload or save. Click Save to write the Markdown back to the source file; front matter is preserved.
 
-Pages without a matching source file are read-only: `.astro` pages (their component syntax cannot be reconstructed from rendered HTML), the built-in default page, and the 404 page. Only the page's main content is editable — surrounding layout, menu, and chrome are left alone. The dev server reloads the page after a successful save.
+Pages backed by `.html` files instead get a plain contenteditable main-content area with the same Save button; saving replaces the `<main>` element in place.
+
+Pages without a matching source file are read-only: `.astro` pages (their component syntax cannot be reconstructed from rendered HTML), the built-in default page, and the 404 page. Only the page's main content is editable — surrounding layout, menu, and chrome are hidden or untouched. The dev server reloads the page after a successful save.
 
 Because saving rewrites the source file, keep `--edit` for trusted local use; do not expose an editable server to the network with `--host`.
 
