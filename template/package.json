@@ -15,6 +15,7 @@
 		"@milkdown/crepe": "^7.23.0",
 		"astro": "^7.4.12",
 		"lightningcss": "^1.33.0",
+		"marked": "^18.2.1",
 		"milligram": "^1.4.1",
 		"sakura.css": "^1.5.1",
 		"sass": "^1.108.2",

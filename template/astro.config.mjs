@@ -247,8 +247,40 @@ const edit = {
 
 const editBootstrap = `
 import { Crepe } from '@milkdown/crepe';
+import { marked } from 'marked';
 import '@milkdown/crepe/theme/common/style.css';
 import '@milkdown/crepe/theme/frame.css';
+
+// Split raw markdown into top-level blocks (blank-line separated, keeping
+// fenced code blocks intact). Each block becomes a clickable edit unit.
+const splitBlocks = (markdown) => {
+	const lines = markdown.split('\\n');
+	const blocks = [];
+	let current = [];
+	let inFence = false;
+	for (const line of lines) {
+		if (/^(\\\`\\\`\\\`|~~~)/.test(line.trim())) {
+			inFence = !inFence;
+		}
+		if (!inFence && line.trim() === '') {
+			if (current.length > 0) {
+				blocks.push(current.join('\\n'));
+				current = [];
+			}
+			continue;
+		}
+		current.push(line);
+	}
+	if (current.length > 0) blocks.push(current.join('\\n'));
+	return blocks;
+};
+
+const editButton = (label, background) => {
+	const button = document.createElement('button');
+	button.textContent = label;
+	button.style.cssText = 'padding:0.35rem 0.9rem;font:600 0.85rem system-ui;color:#fff;background:' + background + ';border:0;border-radius:0.5rem;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25)';
+	return button;
+};
 
 const response = await fetch('/astro-ssg-edit/status?path=' + encodeURIComponent(window.location.pathname));
 if (!response.ok) throw new Error('Could not query edit status');
@@ -256,51 +288,95 @@ const status = await response.json();
 if (!status.editable) {
 	// Nothing to edit on this route (astro pages, default page, 404).
 } else if (status.type === '.md' || status.type === '.mdx') {
-	// Live markdown WYSIWYG via Milkdown Crepe.
+	// Live markdown WYSIWYG, one block at a time, via Milkdown Crepe.
 	const sourceResponse = await fetch('/astro-ssg-edit/source?path=' + encodeURIComponent(window.location.pathname));
 	const source = await sourceResponse.json();
 	if (!source.ok) throw new Error(source.error ?? 'Could not load markdown source');
+	let blocks = splitBlocks(source.markdown);
 	const target = document.querySelector('main') ?? document.body;
 	for (const child of [...target.children]) {
 		child.dataset.ssgEditHidden = 'true';
 		child.style.display = 'none';
 	}
-	const root = document.createElement('div');
-	root.className = 'ssg-crepe-root';
-	target.append(root);
-	const crepe = new Crepe({ root, defaultValue: source.markdown });
-	await crepe.create();
-	window.__SSG_CREPE__ = crepe;
-	const button = document.createElement('button');
-	button.textContent = 'Save';
-	button.dataset.ssgEditUi = 'true';
-	button.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:9999;padding:0.5rem 1rem;font:600 0.9rem system-ui;color:#fff;background:#4f8ef7;border:0;border-radius:0.5rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
-	const note = document.createElement('span');
-	note.dataset.ssgEditUi = 'true';
-	note.style.cssText = 'position:fixed;bottom:1.25rem;right:5rem;z-index:9999;font:0.85rem system-ui;color:#555';
-	document.body.append(button, note);
-	button.addEventListener('click', async () => {
-		button.disabled = true;
-		note.textContent = 'Saving…';
-		try {
-			const save = await fetch('/astro-ssg-edit/save', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ path: window.location.pathname, markdown: crepe.getMarkdown() }),
-			});
-			const result = await save.json();
-			if (result.ok) {
-				note.textContent = 'Saved.';
-				window.location.reload();
-			} else {
-				note.textContent = 'Save failed: ' + (result.error ?? 'unknown error');
-				button.disabled = false;
+	const list = document.createElement('div');
+	list.className = 'ssg-edit-blocks';
+	list.style.cssText = 'max-width:46rem;margin:0 auto;padding:1.5rem 1rem;display:flex;flex-direction:column;gap:0.35rem';
+	target.append(list);
+
+	const renderBlocks = () => {
+		list.innerHTML = '';
+		blocks.forEach((block, index) => {
+			const cell = document.createElement('div');
+			cell.className = 'ssg-edit-block';
+			cell.dataset.index = String(index);
+			cell.style.cssText = 'padding:0.3rem 0.5rem;border:2px dashed transparent;border-radius:0.5rem;cursor:text';
+			cell.innerHTML = marked.parse(block);
+			cell.addEventListener('mouseenter', () => { cell.style.borderColor = '#cbd5e1'; });
+			cell.addEventListener('mouseleave', () => { if (!cell.dataset.active) cell.style.borderColor = 'transparent'; });
+			cell.addEventListener('click', () => startEdit(cell, index));
+			list.append(cell);
+		});
+	};
+
+	const startEdit = (cell, index) => {
+		if (cell.dataset.active) return;
+		cell.dataset.active = 'true';
+		const blockSource = blocks[index];
+		cell.style.display = 'none';
+
+		const editorWrap = document.createElement('div');
+		editorWrap.style.cssText = 'border:2px solid #4f8ef7;border-radius:0.5rem;padding:0.35rem 0.5rem';
+		const root = document.createElement('div');
+		editorWrap.append(root);
+
+		const controls = document.createElement('div');
+		controls.style.cssText = 'display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem';
+		const saveButton = editButton('Save', '#4f8ef7');
+		const cancelButton = editButton('Cancel', '#64748b');
+		controls.append(cancelButton, saveButton);
+		editorWrap.append(controls);
+		cell.insertAdjacentElement('afterend', editorWrap);
+
+		const crepe = new Crepe({ root, defaultValue: blockSource });
+		const note = document.createElement('span');
+		note.style.cssText = 'align-self:center;font:0.8rem system-ui;color:#b91c1c';
+
+		const closeEditor = () => {
+			crepe.destroy();
+			editorWrap.remove();
+			renderBlocks();
+		};
+
+		crepe.create();
+		cancelButton.addEventListener('click', closeEditor);
+		saveButton.addEventListener('click', async () => {
+			saveButton.disabled = true;
+			note.textContent = 'Saving…';
+			try {
+				const updated = crepe.getMarkdown().trim();
+				const nextBlocks = [...blocks.slice(0, index), updated, ...blocks.slice(index + 1)];
+				const save = await fetch('/astro-ssg-edit/save', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({ path: window.location.pathname, markdown: nextBlocks.join('\\n\\n') }),
+				});
+				const result = await save.json();
+				if (result.ok) {
+					note.textContent = '';
+					window.location.reload();
+				} else {
+					note.textContent = 'Save failed: ' + (result.error ?? 'unknown error');
+					saveButton.disabled = false;
+				}
+			} catch {
+				note.textContent = 'Save failed.';
+				saveButton.disabled = false;
 			}
-		} catch {
-			note.textContent = 'Save failed.';
-			button.disabled = false;
-		}
-	});
+		});
+		controls.prepend(note);
+	};
+
+	renderBlocks();
 } else {
 	// Static HTML: contenteditable main with an explicit Save button.
 	const target = document.querySelector('main') ?? document.body;
