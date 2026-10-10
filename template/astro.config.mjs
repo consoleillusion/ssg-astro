@@ -72,6 +72,9 @@ const classlessTheme = classlessThemes.includes(requestedClasslessTheme)
 	? requestedClasslessTheme
 	: '';
 
+const userCssPath = (process.env.SSG_CSS_PATH ?? '').trim();
+const userCssRoute = '/astro-ssg-user.css';
+
 /**
  * Serve the selected classless stylesheet from node_modules and add it to
  * pages that do not already get it from Layout.astro (for example Markdown
@@ -100,6 +103,43 @@ if (!document.querySelector('link[data-ssg-classless]')) {
 	link.rel = 'stylesheet';
 	link.href = ${JSON.stringify(`/${classlessTheme}.css`)};
 	link.dataset.ssgClassless = ${JSON.stringify(classlessTheme)};
+	document.head.appendChild(link);
+}
+`
+			);
+		},
+	},
+};
+
+/**
+ * Serve a user-provided CSS file at a well-known route and add it to pages
+ * that do not already get it from Layout.astro (for example Markdown pages).
+ * The file is read from its original path on every request, so edits are
+ * picked up without a restart.
+ *
+ * @type {import('astro').AstroIntegration}
+ */
+const userStyles = {
+	name: 'ssg-user-styles',
+	hooks: {
+		'astro:config:setup': ({ injectRoute, injectScript }) => {
+			if (!userCssPath) {
+				return;
+			}
+
+			injectRoute({
+				pattern: userCssRoute,
+				entrypoint: './src/theme/user-css.ts',
+			});
+
+			injectScript(
+				'page',
+				`
+if (!document.querySelector('link[data-ssg-css]')) {
+	const link = document.createElement('link');
+	link.rel = 'stylesheet';
+	link.href = ${JSON.stringify(userCssRoute)};
+	link.dataset.ssgCss = 'true';
 	document.head.appendChild(link);
 }
 `
@@ -185,7 +225,7 @@ const lowercaseRoutes = {
 
 // https://astro.build/config
 export default defineConfig({
-	integrations: [missingPage, classlessStyles, mdx(), svelte()],
+	integrations: [missingPage, classlessStyles, userStyles, mdx(), svelte()],
 	vite: {
 		plugins: [lowercaseRoutes],
 	},
