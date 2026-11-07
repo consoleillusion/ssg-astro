@@ -169,6 +169,37 @@ function routesFor() {
 }
 
 /**
+ * Reload connected pages when the --css file changes. The file lives outside
+ * the project root and is not in Vite's module graph, so Vite would not
+ * notice it at all; the route handler re-reads it on every request, and this
+ * plugin makes connected browsers reload when it changes.
+ *
+ * @type {import('vite').Plugin}
+ */
+const userCssReload = {
+	name: 'ssg-user-css-reload',
+	configureServer(server) {
+		if (!userCssPath) {
+			// No --css file passed; nothing to watch.
+			return;
+		}
+
+		const watched = path.resolve(userCssPath);
+		server.watcher.add(watched);
+
+		const reload = (file) => {
+			if (path.resolve(file) === watched) {
+				server.ws.send({ type: 'full-reload' });
+			}
+		};
+
+		server.watcher.on('change', reload);
+		server.watcher.on('add', reload);
+		server.watcher.on('unlink', reload);
+	},
+};
+
+/**
  * Rewrite lowercase URLs to the case-preserving route Astro generates.
  * This keeps links extensionless and lowercase while matching files such as
  * README.md, About.astro, or docs/Getting-Started.md.
@@ -227,6 +258,6 @@ const lowercaseRoutes = {
 export default defineConfig({
 	integrations: [missingPage, classlessStyles, userStyles, mdx(), svelte()],
 	vite: {
-		plugins: [lowercaseRoutes],
+		plugins: [lowercaseRoutes, userCssReload],
 	},
 });

@@ -98,7 +98,7 @@ Unknown theme names are rejected.
 
 ## Custom stylesheet
 
-`--css <file>` injects a `.css` file into every Astro-rendered page (`.astro`, `.md`, and `.mdx`) and the built-in default page. Static `.html` pages are served as-is and are not modified. The file path is resolved against the current directory; the file is served by the dev server at `/astro-ssg-user.css` and is re-read from disk on every request, so editing it does not require a restart or a rebuild. It can be combined with `--classless`; the custom stylesheet is loaded after the classless one and wins on equal specificity.
+`--css <file>` injects a `.css` file into every Astro-rendered page (`.astro`, `.md`, and `.mdx`) and the built-in default page. Static `.html` pages are served as-is and are not modified. The file path is resolved against the current directory; the file is served by the dev server at `/astro-ssg-user.css` and is re-read from disk on every request. The file is watched by the dev server, and connected pages reload automatically when it changes. It can be combined with `--classless`; the custom stylesheet is loaded after the classless one and wins on equal specificity.
 
 ```bash
 # Node CLI
