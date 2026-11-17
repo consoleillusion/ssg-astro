@@ -62,7 +62,14 @@ Pass any arguments after `--`; they are handed to the same CLI as `astro-ssg ser
 nix run github:consoleillusion/ssg-astro#serve -- --theme milligram ./public --port 3000
 ```
 
-The Nix app is a thin wrapper around `astro-ssg serve` (Bun from nixpkgs). The cache defaults to `~/.cache/astro-ssg`; set `ASTRO_SSG_CACHE` to override it.
+The `#serve` app is a thin wrapper around `astro-ssg serve` (Bun from nixpkgs). The cache defaults to `~/.cache/astro-ssg`; set `ASTRO_SSG_CACHE` to override it.
+
+To forward arbitrary CLI commands untouched — e.g. `themes` — use the `#astro-ssg` app, which passes every argument straight to the CLI:
+
+```bash
+nix run github:consoleillusion/ssg-astro#astro-ssg -- themes
+nix run github:consoleillusion/ssg-astro#astro-ssg -- serve ./public --port 3000
+```
 
 ## Routing
 

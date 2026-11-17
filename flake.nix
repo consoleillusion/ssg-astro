@@ -52,6 +52,15 @@
       '';
     };
 
+    # Thin wrapper for arbitrary CLI invocations: every argument goes
+    # straight to the CLI untouched, so new commands work without touching
+    # this file.
+    astroSsgCli = pkgs.writeShellApplication {
+      name = "astro-ssg";
+      runtimeInputs = [ pkgs.bun ];
+      text = ''exec bun "${astroSsg}/bin/astro-ssg.js" "$@"'';
+    };
+
     # Thin wrapper: every argument goes straight to the Bun-run CLI (cac), so
     # the Nix entry point accepts exactly the same interface as `astro-ssg serve`.
     serve = pkgs.writeShellApplication {
@@ -64,9 +73,14 @@
       type = "app";
       program = "${serve}/bin/serve";
     };
-  in {
-    packages.${system} = { default = serve; inherit serve; };
 
-    apps.${system} = { default = app; serve = app; };
+    cliApp = {
+      type = "app";
+      program = "${astroSsgCli}/bin/astro-ssg";
+    };
+  in {
+    packages.${system} = { default = serve; inherit serve; astro-ssg = astroSsgCli; };
+
+    apps.${system} = { default = app; serve = app; astro-ssg = cliApp; };
   };
 }
