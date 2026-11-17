@@ -463,6 +463,18 @@ cli
         )
   )
 
+cli
+  .command("themes", "List the available themes")
+  .action(
+    () =>
+      ( console.log("Available themes (default: sakura):")
+      , THEMES.forEach((theme) =>
+          console.log(`  ${theme}${theme === DEFAULT_THEME ? " (default)" : ""}`)
+        )
+      , console.log("\nUse one with `astro-ssg serve --theme <theme>`.")
+      )
+  )
+
 cli.help((sections) =>
   sections.concat
     ( [ { title: "Cache"
@@ -476,7 +488,11 @@ cli.version(packageJson.version)
 const parsed = cli.parse()
 
 if (!cli.matchedCommand) {
-  parsed.args.length === 0
-    ? cli.outputHelp()
-    : fail(`Unknown command "${parsed.args[0]}". This CLI has one command: serve. See astro-ssg --help.`)
+  // cac already printed its own output for --help/--version.
+  const cliOptions = /** @type {{ help?: unknown, version?: unknown }} */ (cli.options ?? {})
+  cliOptions.help || cliOptions.version
+    ? process.exit(0)
+    : parsed.args.length === 0
+      ? cli.outputHelp()
+      : fail(`Unknown command "${parsed.args[0]}". This CLI has two commands: serve and themes. See astro-ssg --help.`)
 }
