@@ -145,7 +145,9 @@ npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --edit
 nix run github:consoleillusion/ssg-astro#serve -- --edit
 ```
 
-With `--edit`, pages backed by `.md` or `.mdx` files become a live Markdown WYSIWYG editor in the browser (powered by Milkdown Crepe): typing `#`, `*`, backticks, etc. formats inline as you type, and the toolbar covers headings, lists, code blocks, tables, and more. The existing page content is replaced by the editor until you reload or save. Click Save to write the Markdown back to the source file; front matter is preserved.
+With `--edit`, pages backed by `.md` or `.mdx` files are edited in the browser one block at a time, with live Markdown WYSIWYG per block (powered by Milkdown Crepe): click the block you want to edit — a paragraph, list, code fence, etc. — and only that block is replaced by an inline editor. Typing `#`, `*`, backticks, etc. formats inline. Save and Cancel buttons appear directly below the block being edited. Save writes the page's Markdown back to the source file with that block replaced; front matter is preserved.
+
+Pages backed by `.html` files instead get a plain contenteditable main-content area with a floating Save button; saving replaces the `<main>` element in place.
 
 Pages backed by `.html` files instead get a plain contenteditable main-content area with the same Save button; saving replaces the `<main>` element in place.
 
