@@ -44,6 +44,7 @@ bunx --bun -p github:consoleillusion/ssg-astro astro-ssg serve
 | `--theme [theme]` | Style every route with a bundled theme stylesheet (see [Themes](#themes); default: `sakura`) |
 | `--css <file>` | Inject a `.css` file into every Astro-rendered page and the built-in default page |
 | `--menu` | Show a page-navigation button in the top-right corner |
+| `--edit` | Make pages backed by `.html`/`.md`/`.mdx` sources editable in the browser and persist edits to disk |
 | `--no-default-page` | Do not provide the missing-index page at `/` |
 | `--port <port>` | Port for the dev server |
 | `--host [host]` | Expose the dev server on the network; `--host` alone or a hostname exposes all interfaces |
@@ -131,6 +132,24 @@ npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --menu
 # Nix
 nix run github:consoleillusion/ssg-astro#serve -- --menu
 ```
+
+## Editing pages
+
+Pass `--edit` to `serve`:
+
+```bash
+# Node CLI
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --edit
+
+# Nix
+nix run github:consoleillusion/ssg-astro#serve -- --edit
+```
+
+In the browser, every page backed by an existing `.html`, `.md`, or `.mdx` file gets a dashed-outline editable main content area and a floating Save button in the bottom-right corner. Click Save to write the changes back to the source file on disk. Markdown pages are converted back to Markdown on save (front matter is preserved); HTML pages have their `<main>` element replaced in place.
+
+Pages without a matching source file are read-only: `.astro` pages (their component syntax cannot be reconstructed from rendered HTML), the built-in default page, and the 404 page. Only the page's main content is editable — surrounding layout, menu, and chrome are left alone. The dev server reloads the page after a successful save.
+
+Because saving rewrites the source file, keep `--edit` for trusted local use; do not expose an editable server to the network with `--host`.
 
 ## Disabling the default missing page
 
