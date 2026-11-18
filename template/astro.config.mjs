@@ -11,7 +11,7 @@ import { satteri } from '@astrojs/markdown-satteri';
 
 import { listPages } from './src/routes.js';
 import { menuMdastPlugin } from './src/menu/satteri.ts';
-import { resolveEditable, applyEdit } from './src/edit/edit.ts';
+import { resolveEditable, readMarkdownSource, applyEdit, applyMarkdownEdit } from './src/edit/edit.ts';
 
 const notFoundFiles = ['404.astro', '404.html', '404.md', '404.mdx'];
 const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx'];
@@ -200,20 +200,37 @@ const edit = {
 				return;
 			}
 
+			if (rawPath === '/astro-ssg-edit/source' && req.method === 'GET') {
+				const target = resolveEditable(pagesDir, url);
+				if (target && (target.type === '.md' || target.type === '.mdx')) {
+					json(res, 200, { ok: true, markdown: readMarkdownSource(target.file) });
+				} else {
+					json(res, 400, { ok: false, error: 'Not an editable markdown page.' });
+				}
+				return;
+			}
+
 			if (rawPath === '/astro-ssg-edit/save' && req.method === 'POST') {
 				readBody(req)
 					.then((raw) => {
-						/** @type {{ path?: string, html?: string }} */
+						/** @type {{ path?: string, html?: string, markdown?: string }} */
 						const payload = JSON.parse(raw);
 						const target = resolveEditable(pagesDir, typeof payload.path === 'string' ? payload.path : '');
 						if (!target) {
 							return json(res, 400, { ok: false, error: 'This route is not editable.' });
 						}
-						if (typeof payload.html !== 'string') {
-							return json(res, 400, { ok: false, error: 'Missing edited HTML.' });
-						}
 						try {
-							applyEdit(target.file, target.type, payload.html);
+							if (target.type === '.html') {
+								if (typeof payload.html !== 'string') {
+									return json(res, 400, { ok: false, error: 'Missing edited HTML.' });
+								}
+								applyEdit(target.file, payload.html);
+							} else {
+								if (typeof payload.markdown !== 'string') {
+									return json(res, 400, { ok: false, error: 'Missing edited markdown.' });
+								}
+								applyMarkdownEdit(target.file, payload.markdown);
+							}
 							json(res, 200, { ok: true });
 						} catch (error) {
 							json(res, 500, { ok: false, error: error instanceof Error ? error.message : String(error) });
@@ -229,12 +246,64 @@ const edit = {
 };
 
 const editBootstrap = `
-(async () => {
+import { Crepe } from '@milkdown/crepe';
+import '@milkdown/crepe/theme/common/style.css';
+import '@milkdown/crepe/theme/frame.css';
+
+const response = await fetch('/astro-ssg-edit/status?path=' + encodeURIComponent(window.location.pathname));
+if (!response.ok) throw new Error('Could not query edit status');
+const status = await response.json();
+if (!status.editable) {
+	// Nothing to edit on this route (astro pages, default page, 404).
+} else if (status.type === '.md' || status.type === '.mdx') {
+	// Live markdown WYSIWYG via Milkdown Crepe.
+	const sourceResponse = await fetch('/astro-ssg-edit/source?path=' + encodeURIComponent(window.location.pathname));
+	const source = await sourceResponse.json();
+	if (!source.ok) throw new Error(source.error ?? 'Could not load markdown source');
 	const target = document.querySelector('main') ?? document.body;
-	const response = await fetch('/astro-ssg-edit/status?path=' + encodeURIComponent(window.location.pathname));
-	if (!response.ok) return;
-	const status = await response.json();
-	if (!status.editable) return;
+	for (const child of [...target.children]) {
+		child.dataset.ssgEditHidden = 'true';
+		child.style.display = 'none';
+	}
+	const root = document.createElement('div');
+	root.className = 'ssg-crepe-root';
+	target.append(root);
+	const crepe = new Crepe({ root, defaultValue: source.markdown });
+	await crepe.create();
+	window.__SSG_CREPE__ = crepe;
+	const button = document.createElement('button');
+	button.textContent = 'Save';
+	button.dataset.ssgEditUi = 'true';
+	button.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:9999;padding:0.5rem 1rem;font:600 0.9rem system-ui;color:#fff;background:#4f8ef7;border:0;border-radius:0.5rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+	const note = document.createElement('span');
+	note.dataset.ssgEditUi = 'true';
+	note.style.cssText = 'position:fixed;bottom:1.25rem;right:5rem;z-index:9999;font:0.85rem system-ui;color:#555';
+	document.body.append(button, note);
+	button.addEventListener('click', async () => {
+		button.disabled = true;
+		note.textContent = 'Saving…';
+		try {
+			const save = await fetch('/astro-ssg-edit/save', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ path: window.location.pathname, markdown: crepe.getMarkdown() }),
+			});
+			const result = await save.json();
+			if (result.ok) {
+				note.textContent = 'Saved.';
+				window.location.reload();
+			} else {
+				note.textContent = 'Save failed: ' + (result.error ?? 'unknown error');
+				button.disabled = false;
+			}
+		} catch {
+			note.textContent = 'Save failed.';
+			button.disabled = false;
+		}
+	});
+} else {
+	// Static HTML: contenteditable main with an explicit Save button.
+	const target = document.querySelector('main') ?? document.body;
 	target.contentEditable = 'true';
 	target.dataset.ssgEditTarget = 'true';
 	target.style.outline = '2px dashed transparent';
@@ -272,7 +341,7 @@ const editBootstrap = `
 			button.disabled = false;
 		}
 	});
-})();
+}
 `;
 
 /**

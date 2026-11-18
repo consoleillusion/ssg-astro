@@ -12,6 +12,7 @@
 		"@astrojs/markdown-satteri": "^0.4.10",
 		"@astrojs/mdx": "^8.1.6",
 		"@astrojs/svelte": "^9.1.6",
+		"@milkdown/crepe": "^7.23.0",
 		"astro": "^7.4.12",
 		"lightningcss": "^1.33.0",
 		"milligram": "^1.4.1",
@@ -19,7 +20,6 @@
 		"sass": "^1.108.2",
 		"skeleton-css": "^2.0.4",
 		"svelte": "^5.57.3",
-		"turndown": "^7.2.0",
 		"tinyglobby": "^0.2.17",
 		"typescript": "^5.9.3"
 	}

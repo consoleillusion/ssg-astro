@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import TurndownService from 'turndown';
 import { listPages } from '../routes.js';
 
 const EDITABLE = new Set(['.html', '.md', '.mdx']);
@@ -54,25 +53,33 @@ export const resolveEditable = (pagesDir, urlPath) => {
 };
 
 /**
- * Persist edited main-content HTML back to the source file.
- * @param {string} file @param {string} type @param {string} html
+ * Return the raw markdown of a .md/.mdx page (front matter stripped).
+ * @param {string} file
+ * @returns {string}
  */
-export const applyEdit = (file, type, html) => {
+export const readMarkdownSource = (file) => frontmatterOf(fs.readFileSync(file, 'utf8')).body;
+
+/**
+ * Persist an edited markdown document, preserving front matter.
+ * @param {string} file @param {string} markdown
+ */
+export const applyMarkdownEdit = (file, markdown) => {
+	const { frontmatter } = frontmatterOf(fs.readFileSync(file, 'utf8'));
+	const clean = markdown.endsWith('\n') ? markdown : `${markdown}\n`;
+	fs.writeFileSync(file, `${frontmatter}${clean}`, 'utf8');
+};
+
+/**
+ * Persist edited main-content HTML back into the HTML file it came from.
+ * @param {string} file @param {string} html
+ */
+export const applyEdit = (file, html) => {
 	const clean = stripEditorArtifacts(html);
 	const source = fs.readFileSync(file, 'utf8');
 
-	if (type === '.html') {
-		const replaced = source.replace(/(<main\b[^>]*>)([\s\S]*?)(<\/main>)/i, (_, open, _body, close) => `${open}${clean}${close}`);
-		if (replaced === source && !/<main\b[^>]*>[\s\S]*?<\/main>/i.test(source)) {
-			throw new Error('Could not find a <main> element in the HTML file.');
-		}
-		fs.writeFileSync(file, replaced, 'utf8');
-		return;
+	const replaced = source.replace(/(<main\b[^>]*>)([\s\S]*?)(<\/main>)/i, (_, open, _body, close) => `${open}${clean}${close}`);
+	if (replaced === source && !/<main\b[^>]*>[\s\S]*?<\/main>/i.test(source)) {
+		throw new Error('Could not find a <main> element in the HTML file.');
 	}
-
-	// .md / .mdx: convert the edited HTML back to Markdown, preserving front matter.
-	const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
-	const { frontmatter } = frontmatterOf(source);
-	const markdown = turndown.turndown(clean);
-	fs.writeFileSync(file, `${frontmatter}${markdown}\n`, 'utf8');
+	fs.writeFileSync(file, replaced, 'utf8');
 };
