@@ -278,7 +278,7 @@ const splitBlocks = (markdown) => {
 const editButton = (label, background) => {
 	const button = document.createElement('button');
 	button.textContent = label;
-	button.style.cssText = 'padding:0.35rem 0.9rem;font:600 0.85rem system-ui;color:#fff;background:' + background + ';border:0;border-radius:0.5rem;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25)';
+	button.style.cssText = 'padding:6px 14px;font:600 14px system-ui;color:#fff;background:' + background + ';border:0;border-radius:0.5rem;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25)';
 	return button;
 };
 
@@ -303,21 +303,23 @@ if (!status.editable) {
 	let blocks = splitBlocks(source.markdown);
 	const target = document.querySelector('main') ?? document.body;
 	for (const child of [...target.children]) {
+		if (child.classList && child.classList.contains('ssg-menu')) continue;
 		child.dataset.ssgEditHidden = 'true';
 		child.style.display = 'none';
 	}
 	const list = document.createElement('div');
 	list.className = 'ssg-edit-blocks';
-	list.style.cssText = 'box-sizing:border-box;width:100%;max-width:46rem;margin:0 auto;padding:1.5rem 1rem;display:flex;flex-direction:column;gap:0.35rem';
+	list.style.cssText = 'box-sizing:border-box;width:100%;max-width:900px;margin:0 auto;padding:12px 8px;display:flex;flex-direction:column;gap:6px';
 	target.append(list);
 
+	let activeEditor = null;
 	const renderBlocks = () => {
 		list.innerHTML = '';
 		blocks.forEach((block, index) => {
 			const cell = document.createElement('div');
 			cell.className = 'ssg-edit-block';
 			cell.dataset.index = String(index);
-			cell.style.cssText = 'padding:0.3rem 0.5rem;border:2px dashed transparent;border-radius:0.5rem;cursor:text';
+			cell.style.cssText = 'padding:2px 4px;border:2px dashed transparent;border-radius:0.5rem;cursor:text';
 			cell.innerHTML = marked.parse(block);
 			cell.addEventListener('mouseenter', () => { cell.style.borderColor = '#cbd5e1'; });
 			cell.addEventListener('mouseleave', () => { if (!cell.dataset.active) cell.style.borderColor = 'transparent'; });
@@ -327,19 +329,20 @@ if (!status.editable) {
 	};
 
 	const startEdit = (cell, index) => {
-		if (cell.dataset.active) return;
+		if (cell.dataset.active || activeEditor) return;
+		activeEditor = { cell };
 		cell.dataset.active = 'true';
 		const blockSource = blocks[index];
 		cell.style.display = 'none';
 
 		const editorWrap = document.createElement('div');
-		editorWrap.style.cssText = 'box-sizing:border-box;width:100%;border:2px solid #4f8ef7;border-radius:0.5rem;padding:0.35rem 0.5rem';
+		editorWrap.style.cssText = 'box-sizing:border-box;width:100%;border:2px solid #4f8ef7;border-radius:0.5rem;padding:6px 8px';
 		const root = document.createElement('div');
 		root.style.width = '100%';
 		editorWrap.append(root);
 
 		const controls = document.createElement('div');
-		controls.style.cssText = 'display:flex;gap:0.5rem;justify-content:flex-end;margin-top:0.5rem';
+		controls.style.cssText = 'display:flex;gap:0.5rem;justify-content:flex-end;margin-top:8px';
 		const saveButton = editButton('Save', '#4f8ef7');
 		const cancelButton = editButton('Cancel', '#64748b');
 		controls.append(cancelButton, saveButton);
@@ -348,9 +351,10 @@ if (!status.editable) {
 
 		const crepe = new Crepe({ root, defaultValue: blockSource });
 		const note = document.createElement('span');
-		note.style.cssText = 'align-self:center;font:0.8rem system-ui;color:#b91c1c';
+		note.style.cssText = 'align-self:center;font:13px system-ui;color:#b91c1c';
 
 		const closeEditor = () => {
+			activeEditor = null;
 			crepe.destroy();
 			editorWrap.remove();
 			renderBlocks();
@@ -398,10 +402,10 @@ if (!status.editable) {
 	const button = document.createElement('button');
 	button.textContent = 'Save';
 	button.dataset.ssgEditUi = 'true';
-	button.style.cssText = 'position:fixed;bottom:1rem;right:1rem;z-index:9999;padding:0.5rem 1rem;font:600 0.9rem system-ui;color:#fff;background:#4f8ef7;border:0;border-radius:0.5rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
+	button.style.cssText = 'position:fixed;bottom:16px;right:16px;z-index:9999;padding:8px 16px;font:600 14px system-ui;color:#fff;background:#4f8ef7;border:0;border-radius:0.5rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.3)';
 	const note = document.createElement('span');
 	note.dataset.ssgEditUi = 'true';
-	note.style.cssText = 'position:fixed;bottom:1.25rem;right:5rem;z-index:9999;font:0.85rem system-ui;color:#555';
+	note.style.cssText = 'position:fixed;bottom:20px;right:80px;z-index:9999;font:13px system-ui;color:#555';
 	document.body.append(button, note);
 	button.addEventListener('click', async () => {
 		const clone = target.cloneNode(true);
