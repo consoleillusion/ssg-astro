@@ -318,11 +318,11 @@ const editButton = (label, background) => {
 
 // Shared fade/slide transitions so editor open/close and save/cancel don't jump.
 const editTransitions =
-	'@keyframes ssg-edit-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }\n' +
-	'.ssg-edit-wrap { transition: opacity .34s ease, transform .34s ease; animation: ssg-edit-in .32s ease; }\n' +
-	'.ssg-edit-wrap.ssg-edit-leaving { opacity: 0; transform: translateY(-8px); }\n' +
-	'.ssg-edit-block { transition: opacity .34s ease .05s; }\n' +
-	'.ssg-edit-block.ssg-edit-entering { opacity: 0; }\n' +
+	'@keyframes ssg-edit-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } } ' +
+	'.ssg-edit-wrap { transition: opacity .34s ease, transform .34s ease; animation: ssg-edit-in .32s ease; } ' +
+	'.ssg-edit-wrap.ssg-edit-leaving { opacity: 0; transform: translateY(-8px); } ' +
+	'.ssg-edit-block { transition: opacity .34s ease .05s; } ' +
+	'.ssg-edit-block.ssg-edit-entering { opacity: 0; } ' +
 	'@media (prefers-reduced-motion: reduce) { .ssg-edit-wrap, .ssg-edit-block { transition: none; animation: none; } }';
 const editStyle = document.createElement('style');
 editStyle.textContent = editTransitions;
