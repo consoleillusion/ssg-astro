@@ -11,6 +11,7 @@ import { satteri } from '@astrojs/markdown-satteri';
 
 import { listPages } from './src/routes.js';
 import { menuMdastPlugin } from './src/menu/satteri.ts';
+import { mermaidMdastPlugin } from './src/mermaid/mermaid.ts';
 import { resolveEditable, readMarkdownSource, applyEdit, applyMarkdownEdit } from './src/edit/edit.ts';
 
 const notFoundFiles = ['404.astro', '404.html', '404.md', '404.mdx'];
@@ -246,23 +247,56 @@ const edit = {
 };
 
 const editBootstrap = `
-import { Crepe } from '@milkdown/crepe';
 import { marked } from 'marked';
-import '@milkdown/crepe/theme/common/style.css';
-import '@milkdown/crepe/theme/frame.css';
+
+// Lazily load mermaid and render any .mermaid divs under root.
+const renderMermaid = async (root) => {
+	const pending = [...root.querySelectorAll('div.mermaid')];
+	if (pending.length === 0) return;
+	const { default: mermaid } = await import('mermaid');
+	mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+	try {
+		await mermaid.run({ nodes: pending });
+	} catch (error) {
+		console.warn('mermaid render failed', error);
+	}
+};
+
+const escapeHtml = (value) =>
+	value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;');
+
+// ::: mermaid blocks render as diagrams; triple-backtick mermaid fences
+// render as plain source code.
+const mermaidSource = (block) => {
+	const match = block.trim().match(/^:::\\s*mermaid\\s*\\n([\\s\\S]*?)\\n?:::\\s*$/i);
+	return match ? match[1] : null;
+};
+
+const blockHtml = (block) => {
+	const code = mermaidSource(block);
+	return code !== null ? '<div class="mermaid">' + escapeHtml(code) + '</div>' : marked.parse(block);
+};
 
 // Split raw markdown into top-level blocks (blank-line separated, keeping
-// fenced code blocks intact). Each block becomes a clickable edit unit.
+// fenced code blocks and ::: directives intact). Each block is an edit unit.
 const splitBlocks = (markdown) => {
 	const lines = markdown.split('\\n');
 	const blocks = [];
 	let current = [];
 	let inFence = false;
+	let inDirective = false;
 	for (const line of lines) {
-		if (/^(\\\`\\\`\\\`|~~~)/.test(line.trim())) {
+		const trimmed = line.trim();
+		if (/^(\`\`\`|~~~)/.test(trimmed)) {
 			inFence = !inFence;
 		}
-		if (!inFence && line.trim() === '') {
+		if (!inFence && /^:::/.test(trimmed)) {
+			inDirective = !inDirective;
+		}
+		if (!inFence && !inDirective && trimmed === '') {
 			if (current.length > 0) {
 				blocks.push(current.join('\\n'));
 				current = [];
@@ -295,7 +329,7 @@ const status = await response.json();
 if (!status.editable) {
 	// Nothing to edit on this route (astro pages, default page, 404).
 } else if (status.type === '.md' || status.type === '.mdx') {
-	// Live markdown WYSIWYG, one block at a time, via Milkdown Crepe.
+	// Raw markdown source editing, one block at a time, with a live preview.
 	markMenuInert();
 	const sourceResponse = await fetch('/astro-ssg-edit/source?path=' + encodeURIComponent(window.location.pathname));
 	const source = await sourceResponse.json();
@@ -319,54 +353,71 @@ if (!status.editable) {
 			const cell = document.createElement('div');
 			cell.className = 'ssg-edit-block';
 			cell.dataset.index = String(index);
-			cell.style.cssText = 'padding:2px 4px;border:2px dashed transparent;border-radius:0.5rem;cursor:text';
-			cell.innerHTML = marked.parse(block);
+			cell.style.cssText = 'padding:2px 4px;border:2px dashed transparent;border-radius:8px;cursor:text';
+			cell.innerHTML = blockHtml(block);
 			cell.addEventListener('mouseenter', () => { cell.style.borderColor = '#cbd5e1'; });
 			cell.addEventListener('mouseleave', () => { if (!cell.dataset.active) cell.style.borderColor = 'transparent'; });
 			cell.addEventListener('click', () => startEdit(cell, index));
 			list.append(cell);
 		});
+		renderMermaid(list);
 	};
 
 	const startEdit = (cell, index) => {
 		if (cell.dataset.active || activeEditor) return;
 		activeEditor = { cell };
 		cell.dataset.active = 'true';
-		const blockSource = blocks[index];
 		cell.style.display = 'none';
 
 		const editorWrap = document.createElement('div');
-		editorWrap.style.cssText = 'box-sizing:border-box;width:100%;border:2px solid #4f8ef7;border-radius:0.5rem;padding:6px 8px';
-		const root = document.createElement('div');
-		root.style.width = '100%';
-		editorWrap.append(root);
+		editorWrap.style.cssText = 'box-sizing:border-box;width:100%;border:2px solid #4f8ef7;border-radius:8px;padding:8px';
+
+		const textarea = document.createElement('textarea');
+		textarea.value = blocks[index];
+		textarea.setAttribute('spellcheck', 'false');
+		textarea.style.cssText = 'display:block;box-sizing:border-box;width:100%;min-height:60px;padding:8px;border:1px solid #cbd5e1;border-radius:6px;font:13px/1.5 monospace;resize:none;overflow:hidden';
+
+		const preview = document.createElement('div');
+		preview.style.cssText = 'padding:8px 4px 0;border-top:1px solid #e2e8f0;margin-top:8px';
 
 		const controls = document.createElement('div');
-		controls.style.cssText = 'display:flex;gap:0.5rem;justify-content:flex-end;margin-top:8px';
+		controls.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:8px';
+		const note = document.createElement('span');
+		note.style.cssText = 'margin-right:auto;font:13px system-ui;color:#b91c1c';
 		const saveButton = editButton('Save', '#4f8ef7');
 		const cancelButton = editButton('Cancel', '#64748b');
-		controls.append(cancelButton, saveButton);
-		editorWrap.append(controls);
+		controls.append(note, cancelButton, saveButton);
+
+		editorWrap.append(textarea, preview, controls);
 		cell.insertAdjacentElement('afterend', editorWrap);
 
-		const crepe = new Crepe({ root, defaultValue: blockSource });
-		const note = document.createElement('span');
-		note.style.cssText = 'align-self:center;font:13px system-ui;color:#b91c1c';
+		const update = async () => {
+			textarea.style.height = 'auto';
+			textarea.style.height = Math.max(60, textarea.scrollHeight) + 'px';
+			preview.innerHTML = blockHtml(textarea.value);
+			await renderMermaid(preview);
+		};
+		textarea.addEventListener('input', update);
+		update();
+		textarea.focus();
 
 		const closeEditor = () => {
 			activeEditor = null;
-			crepe.destroy();
 			editorWrap.remove();
 			renderBlocks();
 		};
 
-		crepe.create();
 		cancelButton.addEventListener('click', closeEditor);
 		saveButton.addEventListener('click', async () => {
 			saveButton.disabled = true;
 			note.textContent = 'Saving…';
 			try {
-				const updated = crepe.getMarkdown().trim();
+				const updated = textarea.value.trim();
+				if (!updated) {
+					note.textContent = 'Cannot save an empty block.';
+					saveButton.disabled = false;
+					return;
+				}
 				const nextBlocks = [...blocks.slice(0, index), updated, ...blocks.slice(index + 1)];
 				const save = await fetch('/astro-ssg-edit/save', {
 					method: 'POST',
@@ -386,7 +437,6 @@ if (!status.editable) {
 				saveButton.disabled = false;
 			}
 		});
-		controls.prepend(note);
 	};
 
 	renderBlocks();
@@ -447,6 +497,37 @@ const editIntegration = {
 				return;
 			}
 			injectScript('page', editBootstrap);
+		},
+	},
+};
+
+/**
+ * Render '::: mermaid' container blocks as SVG diagrams in the page. The
+ * mdast plugin in src/mermaid/mermaid.ts emits <div class="mermaid"> blocks;
+ * this lazy-loads mermaid and turns them into diagrams. Fenced triple-backtick
+ * mermaid blocks are intentionally left alone — those render as source code.
+ */
+const mermaidBootstrap = `
+const render = async () => {
+	const pending = [...document.querySelectorAll('div.mermaid')];
+	if (pending.length === 0) return;
+	const { default: mermaid } = await import('mermaid');
+	mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+	try {
+		await mermaid.run({ nodes: pending });
+	} catch (error) {
+		console.warn('mermaid render failed', error);
+	}
+};
+render();
+`;
+
+/** @type {import('astro').AstroIntegration} */
+const mermaid = {
+	name: 'ssg-mermaid',
+	hooks: {
+		'astro:config:setup': ({ injectScript }) => {
+			injectScript('page', mermaidBootstrap);
 		},
 	},
 };
@@ -652,11 +733,16 @@ export default defineConfig({
 		// components, which cannot be pages here anyway.
 		entrypoint: './src/logger.js',
 	},
-	integrations: [missingPage, themeStyles, userStyles, menu, editIntegration, mdx(), svelte()],
+	integrations: [missingPage, themeStyles, userStyles, menu, editIntegration, mermaid, mdx(), svelte()],
 	markdown: {
-		processor: satteri({ mdastPlugins: menuEnabled ? [menuMdastPlugin()] : [] }),
+		processor: satteri({ mdastPlugins: [mermaidMdastPlugin(), ...(menuEnabled ? [menuMdastPlugin()] : [])] }),
 	},
 	vite: {
+		optimizeDeps: {
+			// Pre-bundle mermaid at startup so the in-page dynamic import never
+			// hits the "new dependencies optimized, refetch" 504.
+			include: ['mermaid'],
+		},
 		plugins: [utf8Html, lowercaseRoutes, userCssReload, edit],
 	},
 });
