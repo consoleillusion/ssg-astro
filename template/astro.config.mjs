@@ -319,9 +319,9 @@ const editButton = (label, background) => {
 // Shared fade/slide transitions so editor open/close and save/cancel don't jump.
 const editTransitions =
 	'@keyframes ssg-edit-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }\n' +
-	'.ssg-edit-wrap { transition: opacity .16s ease, transform .16s ease; animation: ssg-edit-in .18s ease; }\n' +
-	'.ssg-edit-wrap.ssg-edit-leaving { opacity: 0; transform: translateY(-6px); }\n' +
-	'.ssg-edit-block { transition: opacity .16s ease; }\n' +
+	'.ssg-edit-wrap { transition: opacity .34s ease, transform .34s ease; animation: ssg-edit-in .32s ease; }\n' +
+	'.ssg-edit-wrap.ssg-edit-leaving { opacity: 0; transform: translateY(-8px); }\n' +
+	'.ssg-edit-block { transition: opacity .34s ease .05s; }\n' +
 	'.ssg-edit-block.ssg-edit-entering { opacity: 0; }\n' +
 	'@media (prefers-reduced-motion: reduce) { .ssg-edit-wrap, .ssg-edit-block { transition: none; animation: none; } }';
 const editStyle = document.createElement('style');
@@ -422,7 +422,7 @@ if (!status.editable) {
 			cell.classList.add('ssg-edit-entering');
 			cell.style.display = '';
 			requestAnimationFrame(() => requestAnimationFrame(() => cell.classList.remove('ssg-edit-entering')));
-			setTimeout(() => editorWrap.remove(), 170);
+			setTimeout(() => editorWrap.remove(), 360);
 		};
 
 		cancelButton.addEventListener('click', closeEditor);
