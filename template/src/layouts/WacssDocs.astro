@@ -1,0 +1,361 @@
+---
+// WacssDocs: the automatically applied layout for `--template wacss-docs`.
+// It uses wacss tokens, helpers and components (Page, NavBar, Link, Badge,
+// Card) and adds the documentation chrome: grouped sidebar, search,
+// on-this-page links and previous/next navigation. Nothing is written into the
+// served directory.
+// Load the stylesheets by URL rather than as side-effect imports: Astro does
+// not hoist CSS from a layout that was injected through Markdown frontmatter,
+// so a plain `import '../styles/wacss.css'` produces an orphaned CSS asset.
+import wacssCss from '../styles/wacss.css?url';
+import docsCss from '../styles/wacss-docs.css?url';
+
+import Badge from '../wacss/Badge/Badge.astro';
+import Card from '../wacss/Card/Card.astro';
+import Link from '../wacss/Link/Link.astro';
+import NavBar from '../wacss/NavBar/NavBar.astro';
+import Page from '../wacss/Page/Page.astro';
+import { loadWacssDocsSite } from '../wacss-docs/config.ts';
+
+interface Props {
+  title?: string;
+  description?: string;
+  frontmatter?: Record<string, any>;
+  headings?: { depth: number; slug: string; text: string }[];
+  home?: boolean;
+}
+
+const {
+  title: propTitle,
+  description: propDescription,
+  frontmatter = {},
+  headings = [],
+  home,
+} = Astro.props as Props;
+
+const site = loadWacssDocsSite();
+const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
+const current = site.itemFor(pathname);
+const { previous, next } = site.neighbors(pathname);
+const pageTitle =
+  propTitle ??
+  frontmatter.title ??
+  headings.find((heading) => heading.depth === 1)?.text ??
+  current?.label ??
+  site.title;
+const pageDescription =
+  propDescription ??
+  frontmatter.description ??
+  current?.description ??
+  site.description;
+const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+const isHome =
+  home === true ||
+  (home !== false && (frontmatter.template === 'home' || pathname === '/'));
+const userCss = process.env.SSG_CSS_PATH ? '/astro-ssg-user.css' : '';
+const searchIndex = JSON.stringify(
+  site.items.map(({ url, label, description }) => ({ url, label, description }))
+).replace(/</g, '\\u003c');
+---
+
+<!doctype html>
+<html lang="en" data-palette={site.palette}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{isHome ? `${site.title} · Docs` : `${pageTitle} · ${site.title}`}</title>
+    {pageDescription && <meta name="description" content={pageDescription} />}
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href={wacssCss} data-wacss-docs-css />
+    <link rel="stylesheet" href={docsCss} data-wacss-docs-css />
+    <meta name="generator" content={Astro.generator} />
+    {userCss && <link rel="stylesheet" href={userCss} data-ssg-css />}
+    <script is:inline define:vars={{ palette: site.palette }}>
+      // Restore the reader's choices before the first paint.
+      try {
+        const mode = localStorage.getItem('wacss:mode');
+        if (mode === 'light' || mode === 'dark') document.documentElement.dataset.mode = mode;
+        const saved = localStorage.getItem('wacss:palette');
+        document.documentElement.dataset.palette = saved || palette;
+      } catch {}
+    </script>
+  </head>
+  <Page class="docs-body">
+    <NavBar
+      title={site.title}
+      href={site.home}
+      current={pathname}
+      links={site.links}
+      start={[{ component: 'DocsMenuButton' }]}
+      end={[{ component: 'DocsControls', data: { palette: site.palette } }]}
+    />
+
+    <aside id="docs-sidebar" class="docs-sidebar" aria-label="Documentation pages">
+      <div class="docs-sidebar-head spread">
+        <strong>Chapters</strong>
+        <button id="docs-close" class="docs-close" type="button" aria-label="Close navigation">✕</button>
+      </div>
+      <nav>
+        {
+          site.groups.map((group) => (
+            <details class="docs-group" open>
+              <summary>{group.title}</summary>
+              <ul>
+                {group.items.map((item) => (
+                  <li>
+                    <a
+                      href={item.url}
+                      aria-current={item.url === pathname ? 'page' : undefined}
+                    >{item.label}</a>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))
+        }
+      </nav>
+    </aside>
+    <button id="docs-scrim" class="docs-scrim" type="button" aria-label="Close navigation" hidden></button>
+
+    <div class="docs-layout">
+      <main id="content" class="docs-main">
+        {
+          isHome && (
+            <section class="docs-hero">
+              <Badge label="Documentation" variant="accent" />
+              <h1>{site.title}</h1>
+              {site.description && <p class="docs-lede">{site.description}</p>}
+              <div class="cluster docs-hero-actions">
+                {site.items[0] && (
+                  <Link href={site.items[0].url} label="Start reading" data-button-root class="primary" />
+                )}
+                {site.links.map((link) => (
+                  <Link href={link.href} label={link.label} />
+                ))}
+              </div>
+            </section>
+          )
+        }
+
+        <article class="docs-prose">
+          <slot />
+        </article>
+
+        {
+          isHome && site.groups.length > 0 && (
+            <section class="docs-cards grid" aria-label="Sections">
+              {site.groups.map((group) => (
+                <Card
+                  header={group.title}
+                  text={group.description || `${group.items.length} chapter${group.items.length === 1 ? '' : 's'}`}
+                  class="docs-card"
+                >
+                  <ul>
+                    {group.items.slice(0, 4).map((item) => (
+                      <li><Link href={item.url} label={item.label} /></li>
+                    ))}
+                  </ul>
+                </Card>
+              ))}
+            </section>
+          )
+        }
+
+        {
+          (previous || next) && (
+            <nav class="docs-pagination spread" aria-label="Chapter navigation">
+              {
+                previous && (
+                  <a class="docs-page-link" href={previous.url} rel="prev">
+                    <small>← Previous</small>
+                    <span>{previous.label}</span>
+                  </a>
+                )
+              }
+              {
+                next && (
+                  <a class="docs-page-link docs-page-link-next" href={next.url} rel="next">
+                    <small>Next →</small>
+                    <span>{next.label}</span>
+                  </a>
+                )
+              }
+            </nav>
+          )
+        }
+
+        {
+          site.footer && (
+            <footer class="docs-footer">{site.footer}</footer>
+          )
+        }
+      </main>
+
+      {
+        toc.length > 0 && (
+          <aside class="docs-toc" aria-label="On this page">
+            <h2>On this page</h2>
+            <ul>
+              {toc.map((heading) => (
+                <li class={heading.depth === 3 ? 'docs-toc-nested' : undefined}>
+                  <a href={`#${heading.slug}`}>{heading.text}</a>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )
+      }
+    </div>
+
+    <script is:inline type="application/json" id="docs-search-index" set:html={searchIndex}></script>
+
+    <dialog id="docs-search" class="docs-search" aria-label="Search documentation">
+      <form method="dialog" class="spread">
+        <strong>Search pages</strong>
+        <button value="close" aria-label="Close search">✕</button>
+      </form>
+      <label class="visually-hidden" for="docs-search-input">Search pages</label>
+      <input id="docs-search-input" type="search" placeholder="Title or description…" autocomplete="off" />
+      <ul id="docs-search-results"></ul>
+    </dialog>
+
+    <script>
+      const root = document.documentElement;
+      const remember = (key: string, value: string) => {
+        try { localStorage.setItem(key, value); } catch {}
+      };
+
+      // Mode toggle: wacss takes dark as its default and follows the system in
+      // light mode until a choice is stored on <html data-mode>.
+      const modeButton = document.getElementById('docs-mode') as HTMLButtonElement | null;
+      const isLight = () =>
+        root.dataset.mode
+          ? root.dataset.mode === 'light'
+          : matchMedia('(prefers-color-scheme: light)').matches;
+      const showMode = () => {
+        if (modeButton) modeButton.textContent = isLight() ? '☀ Light' : '☾ Dark';
+      };
+      modeButton?.addEventListener('click', () => {
+        const mode = isLight() ? 'dark' : 'light';
+        root.dataset.mode = mode;
+        remember('wacss:mode', mode);
+        showMode();
+      });
+      showMode();
+
+      const paletteSelect = document.getElementById('docs-palette') as HTMLSelectElement | null;
+      if (paletteSelect) {
+        paletteSelect.value = root.dataset.palette ?? paletteSelect.options[0]!.value;
+        paletteSelect.addEventListener('change', () => {
+          root.dataset.palette = paletteSelect.value;
+          remember('wacss:palette', paletteSelect.value);
+        });
+      }
+
+      // Off-canvas navigation drawer.
+      const menuButton = document.getElementById('docs-menu') as HTMLButtonElement | null;
+      const sidebar = document.getElementById('docs-sidebar');
+      const closeButton = document.getElementById('docs-close') as HTMLButtonElement | null;
+      const scrim = document.getElementById('docs-scrim') as HTMLButtonElement | null;
+      const setDrawer = (open: boolean, restoreFocus = true) => {
+        document.body.classList.toggle('docs-nav-open', open);
+        menuButton?.setAttribute('aria-expanded', String(open));
+        if (scrim) scrim.hidden = !open;
+        if (open) closeButton?.focus();
+        else if (restoreFocus) menuButton?.focus();
+      };
+      menuButton?.addEventListener('click', () =>
+        setDrawer(!document.body.classList.contains('docs-nav-open'))
+      );
+      closeButton?.addEventListener('click', () => setDrawer(false));
+      scrim?.addEventListener('click', () => setDrawer(false));
+      sidebar?.querySelectorAll('a').forEach((link) =>
+        link.addEventListener('click', () => setDrawer(false, false))
+      );
+
+      // Search: a tiny local index rendered from the same page list as the sidebar.
+      type Item = { url: string; label: string; description: string };
+      const items: Item[] = JSON.parse(
+        document.getElementById('docs-search-index')?.textContent ?? '[]'
+      );
+      const dialog = document.getElementById('docs-search') as HTMLDialogElement | null;
+      const input = document.getElementById('docs-search-input') as HTMLInputElement | null;
+      const results = document.getElementById('docs-search-results') as HTMLUListElement | null;
+
+      const renderResults = () => {
+        if (!results || !input) return;
+        const query = input.value.trim().toLowerCase();
+        const matches = items
+          .filter((item) =>
+            !query ||
+            `${item.label} ${item.description} ${item.url}`.toLowerCase().includes(query)
+          )
+          .slice(0, 30);
+        results.replaceChildren();
+        for (const item of matches) {
+          const li = document.createElement('li');
+          const anchor = document.createElement('a');
+          anchor.href = item.url;
+          const label = document.createElement('strong');
+          label.textContent = item.label;
+          anchor.append(label);
+          if (item.description) {
+            const description = document.createElement('small');
+            description.textContent = item.description;
+            anchor.append(description);
+          }
+          anchor.addEventListener('click', () => dialog?.close());
+          li.append(anchor);
+          results.append(li);
+        }
+      };
+      const openSearch = () => {
+        if (!dialog) return;
+        if (!dialog.open) dialog.showModal();
+        input?.focus();
+        input?.select();
+        renderResults();
+      };
+      document.getElementById('docs-search-open')?.addEventListener('click', openSearch);
+      input?.addEventListener('input', renderResults);
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && document.body.classList.contains('docs-nav-open')) {
+          setDrawer(false);
+          return;
+        }
+        const target = event.target as HTMLElement | null;
+        const typing =
+          target instanceof HTMLInputElement ||
+          target instanceof HTMLTextAreaElement ||
+          target?.isContentEditable;
+        if ((event.key === '/' && !typing) || (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey))) {
+          event.preventDefault();
+          openSearch();
+        }
+      });
+      renderResults();
+
+      // Keep the on-this-page link in step with the section being read.
+      const tocLinks = [...document.querySelectorAll<HTMLAnchorElement>('.docs-toc a')];
+      if (tocLinks.length > 0 && 'IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue;
+              for (const link of tocLinks) {
+                if (link.hash === `#${entry.target.id}`) link.setAttribute('aria-current', 'true');
+                else link.removeAttribute('aria-current');
+              }
+            }
+          },
+          { rootMargin: '0px 0px -70% 0px' }
+        );
+        for (const link of tocLinks) {
+          const target = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+          if (target) observer.observe(target);
+        }
+      }
+    </script>
+  </Page>
+</html>
+

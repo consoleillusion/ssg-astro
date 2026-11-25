@@ -1,7 +1,9 @@
 ---
 import path from 'node:path';
-import { decorateTypstHtml, findTypstPage, renderTypst } from './typst.ts';
+import WacssDocs from '../layouts/WacssDocs.astro';
+import { decorateTypstHtml, findTypstPage, renderTypst, typstBody, typstTitle } from './typst.ts';
 
+const docsTemplate = (process.env.SSG_TEMPLATE ?? '').trim().toLowerCase() === 'wacss-docs';
 const pagesDir = path.join(process.cwd(), 'src', 'pages');
 let file = findTypstPage(pagesDir, Astro.url.pathname);
 if (!file) {
@@ -16,4 +18,12 @@ if (!file) {
 const html = decorateTypstHtml(renderTypst(file, pagesDir));
 ---
 
-<Fragment set:html={html} />
+{
+	docsTemplate ? (
+		<WacssDocs title={typstTitle(html)} home={false}>
+			<Fragment set:html={typstBody(html)} />
+		</WacssDocs>
+	) : (
+		<Fragment set:html={html} />
+	)
+}

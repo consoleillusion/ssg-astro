@@ -1,0 +1,39 @@
+{
+  "title": "SRS design book",
+  "description": "Goals, rules, protocol and roadmap for the Standard Resource Server: a complete backend generated from JSON Schema.",
+  "palette": "sakura",
+  "footer": "SRS design book · Markdown chapters, with a PDF edition built from index.typ",
+  "hide": ["README.md"],
+  "groups": [
+    {
+      "title": "I. Project",
+      "description": "What SRS is for, what it is built with, and how its parts fit together.",
+      "pages": ["why.md", "introduction.md", "goals.md", "stack.md", "architecture.md"]
+    },
+    {
+      "title": "II. Data and API",
+      "description": "How schema becomes tables, migrations, views, access rules and routes.",
+      "pages": ["schema.md", "migrations.md", "authored-views.md", "existing-databases.md", "access-control.md", "http-api.md"]
+    },
+    {
+      "title": "III. Security",
+      "description": "The attacker model, and the protocol that keeps SRS secure without TLS.",
+      "pages": ["threat-model.md", "transport.md", "accounts.md", "requests.md", "lifecycle.md", "encryption.md"]
+    },
+    {
+      "title": "IV. Delivery",
+      "description": "Running SRS, the order it is built in, and the work that remains.",
+      "pages": ["operations.md", "implementation.md", "roadmap.md"]
+    },
+    {
+      "title": "V. Working on SRS",
+      "description": "Rules for contributors and agents, where things live, and where the project stands.",
+      "pages": ["contributing.md", "layout.md", "decisions.md", "status.md"]
+    },
+    {
+      "title": "VI. Reference",
+      "description": "The schema keywords, data model, API, routes, settings and brand.",
+      "pages": ["ref-schema.md", "ref-data-model.md", "ref-api.md", "ref-auth.md", "ref-deployment.md", "ref-development.md", "ref-console.md", "ref-branding.md"]
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import { includedTypstFiles, listPages } from './src/routes.js';
 import { menuMdastPlugin } from './src/menu/satteri.ts';
 import { mermaidMdastPlugin } from './src/mermaid/mermaid.ts';
 import { resolveEditable, readMarkdownSource, applyEdit, applyMarkdownEdit } from './src/edit/edit.ts';
+import { wacssDocsLayoutPlugin } from './src/wacss-docs/layout-plugin.ts';
 
 const notFoundFiles = ['404.astro', '404.html', '404.md', '404.mdx', '404.typ'];
 const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx', 'index.typ'];
@@ -222,6 +223,9 @@ const userCssPath = (process.env.SSG_CSS_PATH ?? '').trim();
 const userCssRoute = '/astro-ssg-user.css';
 const menuEnabled = process.env.SSG_MENU === '1';
 const editEnabled = process.env.SSG_EDIT === '1';
+// wacss-docs supplies its own shell, styling and navigation. It ignores
+// --theme and --menu so those cannot layer a second set of chrome on top.
+const wacssDocsEnabled = (process.env.SSG_TEMPLATE ?? '').trim().toLowerCase() === 'wacss-docs';
 
 /**
  * Serve the selected theme stylesheet from node_modules and add it to
@@ -234,7 +238,7 @@ const themeStyles = {
 	name: 'ssg-theme-styles',
 	hooks: {
 		'astro:config:setup': ({ injectRoute, injectScript }) => {
-			if (!theme) {
+			if (!theme || wacssDocsEnabled) {
 				return;
 			}
 
@@ -707,7 +711,7 @@ const menu = {
 	name: 'ssg-menu',
 	hooks: {
 		'astro:config:setup': ({ injectScript }) => {
-			if (!menuEnabled) {
+			if (!menuEnabled || wacssDocsEnabled) {
 				return;
 			}
 
@@ -907,7 +911,13 @@ export default defineConfig({
 	},
 	integrations: [hideGeneratedHtml, typstPages, missingPage, themeStyles, userStyles, menu, editIntegration, mermaid, mdx(), svelte()],
 	markdown: {
-		processor: satteri({ mdastPlugins: [mermaidMdastPlugin(), ...(menuEnabled ? [menuMdastPlugin()] : [])] }),
+		processor: satteri({
+			mdastPlugins: [
+				mermaidMdastPlugin(),
+				...(menuEnabled && !wacssDocsEnabled ? [menuMdastPlugin()] : []),
+				...(wacssDocsEnabled ? [wacssDocsLayoutPlugin] : []),
+			],
+		}),
 	},
 	vite: {
 		optimizeDeps: {

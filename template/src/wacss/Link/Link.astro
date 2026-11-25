@@ -1,0 +1,5 @@
+---
+// Link: an anchor driven by data. Styled by the generated `a` element rules.
+const { href, label, current = false, class: className, ...rest } = Astro.props as Record<string, any>;
+---
+<a href={href} class={className} aria-current={current ? "page" : undefined} {...rest}>{label}<slot /></a>

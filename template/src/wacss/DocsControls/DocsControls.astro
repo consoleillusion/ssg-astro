@@ -1,0 +1,21 @@
+---
+// The controls at the end of the wacss NavBar. Buttons and the select are
+// styled by wacss' generated element rules; Docs.astro owns their behaviour.
+const { palette = 'kinari' } = Astro.props as { palette?: string };
+const palettes = [
+  { value: 'kinari', label: 'Kinari' },
+  { value: 'matcha', label: 'Matcha' },
+  { value: 'aizome', label: 'Aizome' },
+  { value: 'sakura', label: 'Sakura' },
+];
+---
+
+<div class="cluster docs-controls">
+  <button id="docs-search-open" type="button" aria-label="Search pages">⌕ <span>Search</span></button>
+  <select id="docs-palette" aria-label="Color palette">
+    {palettes.map((option) => (
+      <option value={option.value} selected={option.value === palette}>{option.label}</option>
+    ))}
+  </select>
+  <button id="docs-mode" type="button" aria-live="polite">◐ Mode</button>
+</div>

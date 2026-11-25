@@ -1,0 +1,23 @@
+---
+// Card: wacss' structural card. The docs layout only needs its static parts,
+// so the original component's dynamic child loading is omitted here.
+const {
+  as: Tag = "article",
+  header,
+  text,
+  class: className = "",
+  ...rest
+} = Astro.props as Record<string, any>;
+const classes = ["card", className].filter(Boolean).join(" ");
+---
+<Tag class={classes} {...rest}>
+  <figure class="frame">
+    <slot name="figure" />
+  </figure>
+  <div class="stack box">
+    {header && <h3>{header}</h3>}
+    {text && <p>{text}</p>}
+    <slot />
+    <slot name="footer" />
+  </div>
+</Tag>

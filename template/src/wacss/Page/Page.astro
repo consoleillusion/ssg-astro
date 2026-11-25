@@ -1,0 +1,6 @@
+---
+// Page: the webpage, rendered as the document's body. Its rules select body, so any body on a
+// wacss page is styled as Page.
+const attributes = Astro.props;
+---
+<body {...attributes}><slot /></body>

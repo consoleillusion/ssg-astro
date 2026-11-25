@@ -7,6 +7,8 @@ import { globSync } from 'tinyglobby';
 import { menuHtml } from '../menu/menu.ts';
 import { includedTypstFiles, listPages } from '../routes.js';
 
+const docsTemplate = (process.env.SSG_TEMPLATE ?? '').trim().toLowerCase() === 'wacss-docs';
+
 const THEMES = new Set([
 	'sakura',
 	'sakura-dark',
@@ -109,12 +111,14 @@ export function renderTypst(file: string, root: string): string {
  * disturbing Typst's own markup.
  */
 export function decorateTypstHtml(html: string): string {
-	const theme = (process.env.SSG_THEME ?? '').trim().toLowerCase();
+	// The docs layout provides its own shell and stylesheet; the custom CSS
+	// file is added by that layout too.
+	const theme = docsTemplate ? '' : (process.env.SSG_THEME ?? '').trim().toLowerCase();
 	const links = [
 		THEMES.has(theme) && !html.includes('data-ssg-theme')
 			? `<link rel="stylesheet" href="/${theme}.css" data-ssg-theme="${theme}">`
 			: '',
-		process.env.SSG_CSS_PATH && !html.includes('data-ssg-css')
+		!docsTemplate && process.env.SSG_CSS_PATH && !html.includes('data-ssg-css')
 			? '<link rel="stylesheet" href="/astro-ssg-user.css" data-ssg-css>'
 			: '',
 	].filter(Boolean);
@@ -126,7 +130,7 @@ export function decorateTypstHtml(html: string): string {
 			: `${tags}${html}`;
 	}
 
-	if (process.env.SSG_MENU === '1' && !html.includes('class="ssg-menu"')) {
+	if (!docsTemplate && process.env.SSG_MENU === '1' && !html.includes('class="ssg-menu"')) {
 		const markup = menuHtml();
 		html = /<\/body>/i.test(html)
 			? html.replace(/<\/body>/i, `${markup}</body>`)
@@ -134,4 +138,19 @@ export function decorateTypstHtml(html: string): string {
 	}
 
 	return html;
+}
+
+/** Typst's <title>, for the docs layout's <title> and page heading. */
+export function typstTitle(html: string): string | undefined {
+	const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+	return title?.replace(/<[^>]+>/g, '').trim() || undefined;
+}
+
+/**
+ * Typst emits a complete document. When the wacss-docs layout owns the shell,
+ * only the body's content is placed into its slot; the Typst <head> and <body>
+ * would otherwise produce nested documents.
+ */
+export function typstBody(html: string): string {
+	return html.match(/<body[^>]*>([\s\S]*?)<\/body>/i)?.[1] ?? html;
 }

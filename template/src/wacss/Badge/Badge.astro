@@ -1,0 +1,12 @@
+---
+// Badge: a short label that marks something. Not interactive; a pressable label is a Chip.
+const {
+  label,
+  variant = "secondary",
+  class: className = "",
+  ...rest
+} = Astro.props as Record<string, any>;
+// The default variant has no class; any other is its class.
+const classes = ["badge", variant === "secondary" ? "" : variant, className].filter(Boolean).join(" ");
+---
+<span class={classes} {...rest}>{label}</span>

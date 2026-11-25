@@ -1,0 +1,44 @@
+---
+// NavBar: the bar across the top of a site, driven by data: a title, links to its sections, and
+// components at the far end given as data ({ component, data }) and loaded by title.
+// Arranged by the .center and .spread layout helpers; its links are Links.
+import Link from "../Link/Link.astro";
+
+const modules = import.meta.glob<{ default: any }>(["../*/*.svelte", "../*/*.astro", "!./NavBar.astro"], { eager: true });
+
+type Child = { component: string; data?: Record<string, unknown> };
+const { title, href = "/", links = [], current, start = [], end = [], class: className, ...rest } = Astro.props as {
+  title?: string;
+  href?: string;
+  links?: { href: string; label: string }[];
+  current?: string;
+  start?: Child[];
+  end?: Child[];
+  [key: string]: any;
+};
+
+const isCurrent = (target: string) =>
+  // Purpose: whether a link leads to the page shown, or to the section it belongs to
+  !!current && (current === target || current.startsWith(`${target}/`));
+const load = (child: Child) =>
+  // Purpose: the component a child names, or undefined
+  (modules[`../${child.component}/${child.component}.svelte`] ?? modules[`../${child.component}/${child.component}.astro`])?.default;
+---
+<header class={["nav-bar", className].filter(Boolean).join(" ")} {...rest}>
+  <nav class="center spread">
+    <div class="cluster">
+      {start.map((child) => {
+        const Component = load(child);
+        return Component && <Component {...child.data ?? {}} />;
+      })}
+      {title && <strong><Link href={href} label={title} /></strong>}
+      {links.map((l) => <Link href={l.href} label={l.label} current={isCurrent(l.href)} />)}
+    </div>
+    <div class="cluster">
+      {end.map((child) => {
+        const Component = load(child);
+        return Component && <Component {...child.data ?? {}} />;
+      })}
+    </div>
+  </nav>
+</header>

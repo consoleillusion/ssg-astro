@@ -1,0 +1,39 @@
+{
+  "title": "astro-ssg design book",
+  "description": "A from-scratch description of astro-ssg: its CLI, cached Astro template, routing, rendering, styling, editing, Typst support, static builds, and wacss-docs template.",
+  "palette": "aizome",
+  "footer": "astro-ssg design book · Markdown chapters, with a PDF edition built from index.typ",
+  "hide": ["README.md"],
+  "groups": [
+    {
+      "title": "I. Foundations",
+      "description": "What the library is, the problem it solves, and where every responsibility lives.",
+      "pages": ["purpose.md", "source-map.md"]
+    },
+    {
+      "title": "II. Operating the CLI",
+      "description": "Commands, flags, validation, cache initialization, dependency installation, and Astro process handling.",
+      "pages": ["cli.md", "cache-and-runtime.md"]
+    },
+    {
+      "title": "III. Content and rendering",
+      "description": "How pages are discovered, rendered, styled, and given optional navigation.",
+      "pages": ["routing.md", "markdown-pipeline.md", "styling.md", "menu.md"]
+    },
+    {
+      "title": "IV. Advanced modes",
+      "description": "In-browser editing, Typst compilation, and publishing static HTML beside sources.",
+      "pages": ["edit-mode.md", "typst.md", "build-output.md"]
+    },
+    {
+      "title": "V. wacss-docs",
+      "description": "The render-time documentation template, its configuration, layout, and bundled components.",
+      "pages": ["wacss-docs-config.md", "wacss-docs-layout.md", "wacss-components.md"]
+    },
+    {
+      "title": "VI. Reference",
+      "description": "Complete flag, environment, and configuration tables, plus invariants and sharp edges.",
+      "pages": ["configuration.md", "invariants.md"]
+    }
+  ]
+}

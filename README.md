@@ -4,6 +4,8 @@ Serve or statically build a directory of web files with Astro. Pages can be `.as
 
 Requires Node.js `>= 22.23.4`, or Bun. Typst pages additionally require the [Typst CLI](https://typst.app) with HTML export support; set `TYPST_BIN` if it is not on `PATH`.
 
+The implementation-level source of truth is the [`design/`](./design/) book. Read it as a site with `astro-ssg serve --template wacss-docs ./design`, or build its PDF with `./design/build.sh`.
+
 ## Quick start
 
 Run these commands from the directory you want to serve:
@@ -31,7 +33,7 @@ Or, from a clone of this repository:
 ./bin/astro-ssg.js build
 ```
 
-`serve` copies a small Astro project to `~/.cache/astro-ssg` (or `%LOCALAPPDATA%\astro-ssg` on Windows), links the given directory (or the current directory) as its `src/pages` directory, installs dependencies, and starts the Astro dev server. All artifacts are stored in the cache; the served directory is never written to or deleted from. The cache initializes itself the first time it is needed — there is no separate setup command. If the cache was set up for a different directory, `serve` repoints it. Set `ASTRO_SSG_CACHE` to use a different cache directory.
+`serve` copies a small Astro project to `~/.cache/astro-ssg` (or `%LOCALAPPDATA%\astro-ssg` on Windows), links the given directory (or the current directory) as its `src/pages` directory, installs dependencies, and starts the Astro dev server. `serve` does not write to or delete from the served directory; `build` deliberately writes marked `.html` files beside source pages. The cache initializes itself the first time it is needed — there is no separate setup command. If the cache was set up for a different directory, `serve` repoints it. Set `ASTRO_SSG_CACHE` to use a different cache directory.
 
 ### With Bun
 
@@ -49,6 +51,7 @@ bunx --bun -p github:consoleillusion/ssg-astro astro-ssg serve
 | :--- | :---------- |
 | `[dir]` | Directory to serve (default: current directory) |
 | `--theme [theme]` | Style every route with a bundled theme stylesheet (see [Themes](#themes); default: `sakura`) |
+| `--template [template]` | Auto-apply a layout and design system to every page (see [Templates](#templates); default: `wacss-docs` when the flag has no value) |
 | `--css <file>` | Inject a `.css` file into every Astro-rendered, Typst, and built-in default page |
 | `--menu` | Show a page-navigation button in the top-right corner |
 | `--edit` | Make pages backed by `.html`/`.md`/`.mdx` sources editable in the browser and persist edits to disk |
@@ -82,7 +85,7 @@ nix run github:consoleillusion/ssg-astro -- build ./public
 bunx --bun -p github:consoleillusion/ssg-astro astro-ssg build ./public
 ```
 
-`build` accepts `[dir]`, `--theme`, `--css`, `--menu`, and `--no-default-page`. It does not accept the dev-server-only `--port`, `--host`, or `--edit` flags. Re-run `build` after changing a source file to refresh its HTML. Source files are never removed, so if you delete a source page, delete its generated HTML file manually.
+`build` accepts `[dir]`, `--theme`, `--template`, `--css`, `--menu`, and `--no-default-page`. It does not accept the dev-server-only `--port`, `--host`, or `--edit` flags. Re-run `build` after changing a source file to refresh its HTML. Source files are never removed, so if you delete a source page, delete its generated HTML file manually.
 
 ## Typst pages
 
@@ -90,7 +93,7 @@ A `.typ` file is compiled with `typst compile --features html --format html` on 
 
 A `.typ` file pulled in with `#include` (directly or through another included file) is treated as a document fragment, not as its own page. Only entrypoint files are compiled and routed, so references such as `@requests` resolve against the complete document instead of failing against a fragment in isolation. Included fragments do not appear in the page menu. Generated `.html` files beside fragments from an earlier build are ignored; delete them manually if you want them gone.
 
-Typst emits a complete HTML document. It is served as-is, with the same opt-in theme, custom stylesheet, and page menu that Markdown pages receive. Typst pages are read-only in `--edit` mode.
+Typst emits a complete HTML document. It is served as-is, with the same opt-in theme, custom stylesheet, and page menu that Markdown pages receive; with `--template wacss-docs`, its body is placed inside the docs layout instead. Typst pages are read-only in `--edit` mode.
 
 ```typ
 = My page
@@ -153,6 +156,66 @@ nix run github:consoleillusion/ssg-astro#serve -- --theme sakura-dark
 Run `astro-ssg themes` to list the available themes and the default.
 
 Unknown theme names are rejected.
+
+## Templates
+
+`--template wacss-docs` turns a directory of Markdown files into a documentation
+site. It applies a layout and the [wacss](https://github.com/consoleillusion/wacss)
+design system — a grouped sidebar, a table of contents, local search (`/` or
+`⌘K`/`Ctrl+K`), previous/next links, and light/dark and palette controls. The
+layout is injected at render time: no frontmatter, layout file, or other source
+file is written into the served directory. Markdown, MDX, Typst, and the
+built-in default/404 pages all receive it.
+
+```bash
+# Node CLI
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg serve --template wacss-docs ./test-docs
+npx --yes --package=github:consoleillusion/ssg-astro astro-ssg build --template wacss-docs ./test-docs
+
+# Nix
+nix run github:consoleillusion/ssg-astro#serve -- --template wacss-docs ./test-docs
+```
+
+Passing `--template` without a name uses `wacss-docs`; `--template none` opts
+out. `--theme` and `--menu` are ignored while a template is active, since the
+template supplies its own styling and navigation. `--css` still works and is
+loaded after the template's stylesheet.
+
+### Site configuration
+
+Add a small `wacss-docs.json` file to the directory you serve (`docs.json` is
+also accepted). It sets the site title, description, palette, footer and
+chapter groups. Every page is discovered from the directory automatically, so
+adding a Markdown file adds a page without editing the config; pages not named
+in a group appear under “More pages”. Use `hide` to leave a file out.
+
+```json
+{
+  "title": "SRS design book",
+  "description": "Goals, rules, protocol and roadmap.",
+  "palette": "sakura",
+  "footer": "Built from Markdown; PDF built from index.typ",
+  "hide": ["README.md"],
+  "groups": [
+    {
+      "title": "I. Project",
+      "description": "What SRS is for, and how its parts fit together.",
+      "pages": ["why.md", { "page": "introduction.md", "title": "Introduction" }]
+    },
+    {
+      "title": "II. Data and API",
+      "pages": ["schema.md", "migrations.md", "http-api.md"]
+    }
+  ],
+  "links": [{ "label": "PDF", "href": "/srs.pdf" }]
+}
+```
+
+A group entry can be a filename or an object with `page`, `title`, and
+`description` overrides. Titles and descriptions default to the page's first
+H1 and first prose paragraph. Available palettes are `kinari`, `matcha`,
+`aizome`, and `sakura`; the bundled wacss stylesheet is used under the MIT
+license (see `template/src/styles/WACSS-LICENSE`).
 
 ## Custom stylesheet
 

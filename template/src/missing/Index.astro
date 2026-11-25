@@ -1,8 +1,12 @@
 ---
 import path from 'node:path';
 import Layout from '../layouts/Layout.astro';
+import WacssDocs from '../layouts/WacssDocs.astro';
 import { listPages } from '../routes.js';
 
+const docsTemplate = process.env.SSG_TEMPLATE === 'wacss-docs';
+const Shell = docsTemplate ? WacssDocs : Layout;
+const ContentTag = docsTemplate ? 'div' : 'main';
 const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/';
 const isRoot = pathname === '/';
 
@@ -11,8 +15,8 @@ const pages = isRoot
 	? listPages(pagesDir).sort((a, b) => a.url.localeCompare(b.url))
 	: [];
 ---
-<Layout title={isRoot ? 'Default page' : 'Page not found'}>
-	<main>
+<Shell title={isRoot ? 'Default page' : 'Page not found'} home={docsTemplate ? false : undefined}>
+	<ContentTag class="missing-page">
 		{
 			isRoot ? (
 				<>
@@ -64,11 +68,11 @@ const pages = isRoot
 				</section>
 			)
 		}
-	</main>
-</Layout>
+	</ContentTag>
+</Shell>
 
 <style>
-	main {
+	.missing-page {
 		box-sizing: border-box;
 		max-width: 42rem;
 		margin: 0 auto;
