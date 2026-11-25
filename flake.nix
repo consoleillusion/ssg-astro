@@ -81,6 +81,6 @@
   in {
     packages.${system} = { default = serve; inherit serve; astro-ssg = astroSsgCli; };
 
-    apps.${system} = { default = app; serve = app; astro-ssg = cliApp; };
+    apps.${system} = { default = cliApp; serve = app; astro-ssg = cliApp; };
   };
 }

@@ -76,7 +76,7 @@ Existing `.html` files are already HTML and are left untouched. The built-in def
 npx --yes --package=github:consoleillusion/ssg-astro astro-ssg build ./public
 
 # Nix
-nix run github:consoleillusion/ssg-astro#astro-ssg -- build ./public
+nix run github:consoleillusion/ssg-astro -- build ./public
 
 # Bun
 bunx --bun -p github:consoleillusion/ssg-astro astro-ssg build ./public
@@ -86,7 +86,9 @@ bunx --bun -p github:consoleillusion/ssg-astro astro-ssg build ./public
 
 ## Typst pages
 
-A `.typ` file is compiled with `typst compile --features html --format html` on each render (dev) or build, with the served directory as Typst's project root so relative includes and images resolve. The Typst CLI must be installed and support HTML export (Typst 0.13+); set `TYPST_BIN` to use a different executable. If no `.typ` files are present, Typst is not needed.
+A `.typ` file is compiled with `typst compile --features html --format html` on each render (dev) or build, with the served directory as Typst's project root so relative includes and images resolve. The Typst CLI must be installed and support HTML export (Typst 0.13+); set `TYPST_BIN` to use a different executable. If no entrypoint `.typ` files are present, Typst is not needed.
+
+A `.typ` file pulled in with `#include` (directly or through another included file) is treated as a document fragment, not as its own page. Only entrypoint files are compiled and routed, so references such as `@requests` resolve against the complete document instead of failing against a fragment in isolation. Included fragments do not appear in the page menu. Generated `.html` files beside fragments from an earlier build are ignored; delete them manually if you want them gone.
 
 Typst emits a complete HTML document. It is served as-is, with the same opt-in theme, custom stylesheet, and page menu that Markdown pages receive. Typst pages are read-only in `--edit` mode.
 
@@ -98,24 +100,23 @@ A paragraph with *strong* text.
 
 ## With Nix
 
+The default app runs the main CLI, so arguments after `--` are passed to it untouched:
+
 ```bash
-nix run github:consoleillusion/ssg-astro#serve
+nix run github:consoleillusion/ssg-astro -- --help
+nix run github:consoleillusion/ssg-astro -- serve ./public --theme milligram --port 3000
+nix run github:consoleillusion/ssg-astro -- build ./public
+nix run github:consoleillusion/ssg-astro -- themes
 ```
 
-Pass any arguments after `--`; they are handed to the same CLI as `astro-ssg serve`, so Nix accepts exactly the same interface:
+`#astro-ssg` is an explicit alias for the same CLI, and `#serve` remains a shortcut that inserts `serve` for you:
 
 ```bash
+nix run github:consoleillusion/ssg-astro#astro-ssg -- build ./public
 nix run github:consoleillusion/ssg-astro#serve -- --theme milligram ./public --port 3000
 ```
 
-The `#serve` app is a thin wrapper around `astro-ssg serve` (Bun and Typst from nixpkgs). The cache defaults to `~/.cache/astro-ssg`; set `ASTRO_SSG_CACHE` to override it.
-
-To forward arbitrary CLI commands untouched — e.g. `build` or `themes` — use the `#astro-ssg` app, which passes every argument straight to the CLI:
-
-```bash
-nix run github:consoleillusion/ssg-astro#astro-ssg -- themes
-nix run github:consoleillusion/ssg-astro#astro-ssg -- serve ./public --port 3000
-```
+The Nix apps bundle Bun and Typst from nixpkgs. The cache defaults to `~/.cache/astro-ssg`; set `ASTRO_SSG_CACHE` to override it.
 
 ## Routing
 

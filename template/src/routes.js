@@ -33,6 +33,50 @@ const isGeneratedHtml = (file) => {
 }
 
 /**
+ * Typst files pulled in with `#include "…"` are parts of another document.
+ * Compiling them as standalone pages loses shared definitions (labels,
+ * variables, imports), so they are not routable pages.
+ *
+ * @param {string} dir
+ * @returns {Set<string>} paths relative to dir, using forward slashes
+ */
+export const includedTypstFiles = (dir) => {
+  /** @type {Set<string>} */
+  const included = new Set()
+  // Include fragments are often underscore-prefixed. Scan all of them so
+  // chained includes are detected even when the middle file is not a page.
+  const files = globSync(["**/*.typ"], {
+    cwd: dir,
+    ignore: ["**/node_modules/**"],
+    followSymbolicLinks: false,
+  })
+  const includePattern = /#[ \t]*include[ \t]*(?:\([ \t]*)?(["'])(.*?)\1[ \t]*\)?/g
+
+  for (const raw of files) {
+    const file = raw.replaceAll(path.sep, "/")
+    let source
+    try {
+      source = fs.readFileSync(path.join(dir, file), "utf8")
+    } catch {
+      continue
+    }
+    for (const match of source.matchAll(includePattern)) {
+      const target = match[2]
+      if (!target) continue
+      // Typst paths starting with "/" are relative to the project root.
+      const resolved =
+        target.startsWith("/")
+          ? path.posix.normalize(target.slice(1))
+          : path.posix.normalize(path.posix.join(path.posix.dirname(file), target))
+      if (resolved === ".." || resolved.startsWith("../")) continue
+      included.add(resolved)
+    }
+  }
+
+  return included
+}
+
+/**
  * @param {string} route
  * @returns {string}
  */
@@ -63,6 +107,7 @@ const encodeRoute = (route) =>
 export const listPages = (dir) => {
   /** @type {Map<string, Page>} */
   const pages = new Map()
+  const included = includedTypstFiles(dir)
 
   const files = globSync(["**/*.{astro,html,md,mdx,typ}"], {
     cwd: dir,
@@ -77,6 +122,8 @@ export const listPages = (dir) => {
     const extension = path.posix.extname(name)
     const extensionPriority = PAGE_EXTENSIONS.indexOf(extension)
     if (extensionPriority === -1) continue
+    // A Typst file included by another document is a fragment, not a page.
+    if (extension === ".typ" && included.has(file)) continue
     const priority = isGeneratedHtml(path.join(dir, file))
       ? PAGE_EXTENSIONS.length
       : extensionPriority

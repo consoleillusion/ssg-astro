@@ -2,8 +2,10 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { globSync } from 'tinyglobby';
+
 import { menuHtml } from '../menu/menu.ts';
-import { listPages } from '../routes.js';
+import { includedTypstFiles, listPages } from '../routes.js';
 
 const THEMES = new Set([
 	'sakura',
@@ -19,9 +21,32 @@ const THEMES = new Set([
 ]);
 
 // Typst is fast enough for a page or two, but recompiling on every dev-server
-// request is needlessly slow. Key the cache on the file's identity so a saved
-// edit immediately produces fresh HTML.
+// request is needlessly slow. Key the cache on the Typst sources' identities so
+// a saved edit to an entrypoint or an included fragment produces fresh HTML.
 const compiled = new Map<string, string>();
+
+/**
+ * Includes change a page's output without changing the entrypoint file, so the
+ * cache key covers every Typst source under the project root.
+ * @param {string} root
+ */
+const typstSourcesKey = (root: string) => {
+	const files = globSync(['**/*.typ'], {
+		cwd: root,
+		ignore: ['**/node_modules/**'],
+		followSymbolicLinks: false,
+	}).sort();
+	return files
+		.map((file) => {
+			try {
+				const stat = fs.statSync(path.join(root, file));
+				return `${file}|${stat.mtimeMs}|${stat.size}`;
+			} catch {
+				return `${file}|missing`;
+			}
+		})
+		.join(';');
+};
 
 /**
  * Find the Typst source backing a URL. Routes are matched case-insensitively,
@@ -29,11 +54,16 @@ const compiled = new Map<string, string>();
  */
 export function findTypstPage(pagesDir: string, urlPath: string): string | null {
 	const lookup = (urlPath.split('?')[0] ?? '/').replace(/\/+$/, '').toLowerCase() || '/';
+	const included = includedTypstFiles(pagesDir);
+	const isFragment = (file: string) =>
+		file.toLowerCase().endsWith('.typ') &&
+		included.has(file.replaceAll(path.sep, '/'));
 	// listPages() deliberately omits the root index and 404, but both can be
 	// Typst pages when they win the route.
 	if (lookup === '/' || lookup === '/404') {
-		const rootFile = path.join(pagesDir, `${lookup === '/' ? 'index' : '404'}.typ`);
-		if (fs.existsSync(rootFile)) return rootFile;
+		const relative = `${lookup === '/' ? 'index' : '404'}.typ`;
+		const rootFile = path.join(pagesDir, relative);
+		if (fs.existsSync(rootFile) && !isFragment(relative)) return rootFile;
 	}
 	for (const page of listPages(pagesDir)) {
 		if (page.file.toLowerCase().endsWith('.typ') && page.lookup === lookup) {
@@ -46,7 +76,7 @@ export function findTypstPage(pagesDir: string, urlPath: string): string | null 
 /** Compile a .typ file to a complete HTML document with the Typst CLI. */
 export function renderTypst(file: string, root: string): string {
 	const stat = fs.statSync(file);
-	const key = `${file}|${stat.mtimeMs}|${stat.size}`;
+	const key = `${file}|${stat.mtimeMs}|${stat.size}|${typstSourcesKey(root)}`;
 	const cached = compiled.get(key);
 	if (cached !== undefined) return cached;
 
