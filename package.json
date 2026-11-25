@@ -1,7 +1,7 @@
 {
   "name": "astro-ssg",
-  "version": "0.1.3",
-  "description": "Serve a directory of Astro, HTML, Markdown, and MDX files.",
+  "version": "0.2.0",
+  "description": "Serve or statically build a directory of Astro, HTML, Markdown, MDX, and Typst files.",
   "type": "module",
   "bin": {
     "astro-ssg": "./bin/astro-ssg.js"

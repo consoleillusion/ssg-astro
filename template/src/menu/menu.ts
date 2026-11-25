@@ -5,9 +5,16 @@ import { listPages } from '../routes.js';
 
 const pagesDir = path.join(process.cwd(), 'src', 'pages');
 
-const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx'];
+const indexFiles = ['index.astro', 'index.html', 'index.md', 'index.mdx', 'index.typ'];
 
 export type MenuLink = { url: string; label: string };
+
+const escapeHtml = (value: string): string =>
+	value
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
 
 /**
  * The navigable pages, computed from disk on every call so the menu is fresh
@@ -25,6 +32,17 @@ export function menuLinks(): MenuLink[] {
 	}
 	return links;
 }
+
+/** The same markup as Menu.astro, as a string for raw-HTML pages. */
+export const menuHtml = (): string => {
+	const links = menuLinks();
+	const items = links
+		.map(({ url, label }) => `<li><a href="${escapeHtml(url)}">${escapeHtml(label)}</a></li>`)
+		.join('');
+	const content =
+		items.length > 0 ? `<ul>${items}</ul>` : '<p class="ssg-menu-empty">No navigable pages yet.</p>';
+	return `<style>${MENU_CSS}</style><details class="ssg-menu"><summary aria-label="Toggle page menu" title="Site pages">☰</summary><div class="ssg-menu-panel"><div class="ssg-menu-inner"><nav class="ssg-menu-nav" aria-label="Site pages">${content}</nav></div></div></details>`;
+};
 
 /**
  * Self-contained styles for the menu. No child combinators, ampersands, or

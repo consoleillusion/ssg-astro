@@ -1,5 +1,5 @@
 {
-  description = "Serve a directory of static web files with Astro";
+  description = "Serve or build a directory of static web files with Astro";
 
   outputs = { self, nixpkgs }:
   let
@@ -34,7 +34,7 @@
 
     astroSsg = pkgs.stdenv.mkDerivation {
       pname = "astro-ssg";
-      version = "0.1.1";
+      version = "0.2.0";
       src = self;
       nativeBuildInputs = [ pkgs.bun ];
       dontBuild = true;
@@ -57,7 +57,7 @@
     # this file.
     astroSsgCli = pkgs.writeShellApplication {
       name = "astro-ssg";
-      runtimeInputs = [ pkgs.bun ];
+      runtimeInputs = [ pkgs.bun pkgs.typst ];
       text = ''exec bun "${astroSsg}/bin/astro-ssg.js" "$@"'';
     };
 
@@ -65,7 +65,7 @@
     # the Nix entry point accepts exactly the same interface as `astro-ssg serve`.
     serve = pkgs.writeShellApplication {
       name = "serve";
-      runtimeInputs = [ pkgs.bun ];
+      runtimeInputs = [ pkgs.bun pkgs.typst ];
       text = ''exec bun "${astroSsg}/bin/astro-ssg.js" serve "$@"'';
     };
 

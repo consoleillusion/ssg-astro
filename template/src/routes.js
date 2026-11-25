@@ -1,10 +1,15 @@
 // @ts-check
+import fs from "node:fs"
 import path from "node:path"
 
 import { globSync } from "tinyglobby"
 
 /** Page file types in duplicate-route priority order. */
-export const PAGE_EXTENSIONS = [".astro", ".html", ".md", ".mdx"]
+export const PAGE_EXTENSIONS = [".astro", ".html", ".md", ".mdx", ".typ"]
+
+// HTML written by `astro-ssg build` carries this marker so it never shadows
+// the source page it was compiled from when the directory is served again.
+export const GENERATED_HTML_MARKER = "<!-- astro-ssg:generated -->"
 
 /**
  * @typedef {{
@@ -16,6 +21,16 @@ export const PAGE_EXTENSIONS = [".astro", ".html", ".md", ".mdx"]
  *   priority: number,
  * }} Page
  */
+
+/** @param {string} file @returns {boolean} */
+const isGeneratedHtml = (file) => {
+  if (path.extname(file).toLowerCase() !== ".html") return false
+  try {
+    return fs.readFileSync(file, "utf8").includes(GENERATED_HTML_MARKER)
+  } catch {
+    return false
+  }
+}
 
 /**
  * @param {string} route
@@ -39,6 +54,8 @@ const encodeRoute = (route) =>
  * original case, and `lookup` is lowercase without a trailing slash.
  *
  * When several files map to one route, PAGE_EXTENSIONS decides the winner.
+ * HTML emitted by `astro-ssg build` is ranked below every source type so an
+ * up-to-date `.astro`/`.md`/`.mdx`/`.typ` file still wins after a build.
  *
  * @param {string} dir
  * @returns {Page[]}
@@ -47,7 +64,7 @@ export const listPages = (dir) => {
   /** @type {Map<string, Page>} */
   const pages = new Map()
 
-  const files = globSync(["**/*.{astro,html,md,mdx}"], {
+  const files = globSync(["**/*.{astro,html,md,mdx,typ}"], {
     cwd: dir,
     ignore: ["**/_*", "**/_*/**", "**/node_modules/**"],
     followSymbolicLinks: false,
@@ -58,8 +75,11 @@ export const listPages = (dir) => {
     const segments = file.split("/")
     const name = segments.pop() ?? ""
     const extension = path.posix.extname(name)
-    const priority = PAGE_EXTENSIONS.indexOf(extension)
-    if (priority === -1) continue
+    const extensionPriority = PAGE_EXTENSIONS.indexOf(extension)
+    if (extensionPriority === -1) continue
+    const priority = isGeneratedHtml(path.join(dir, file))
+      ? PAGE_EXTENSIONS.length
+      : extensionPriority
 
     const base = name.slice(0, -extension.length)
 

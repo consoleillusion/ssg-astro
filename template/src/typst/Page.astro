@@ -1,0 +1,19 @@
+---
+import path from 'node:path';
+import { decorateTypstHtml, findTypstPage, renderTypst } from './typst.ts';
+
+const pagesDir = path.join(process.cwd(), 'src', 'pages');
+let file = findTypstPage(pagesDir, Astro.url.pathname);
+if (!file) {
+	// Astro renders the injected /404 route for missing URLs, but Astro.url
+	// still holds the original pathname. Fall back to the 404 Typst source.
+	file = findTypstPage(pagesDir, '/404');
+}
+if (!file) {
+	throw new Error(`No Typst page found for ${Astro.url.pathname}.`);
+}
+
+const html = decorateTypstHtml(renderTypst(file, pagesDir));
+---
+
+<Fragment set:html={html} />
